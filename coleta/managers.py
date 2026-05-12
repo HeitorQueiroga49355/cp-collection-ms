@@ -3,7 +3,6 @@ from django.db import models
 
 class ImovelManager(models.Manager):
     def upsert_from_evento(self, payload: dict):
-        """Recebe payload do RabbitMQ e faz upsert pelo IPTU."""
         iptu = payload['iptu']
         defaults = {
             'id_externo': payload.get('id_externo', ''),
@@ -19,5 +18,4 @@ class ImovelManager(models.Manager):
 
 class ColetaManager(models.Manager):
     def criar_idempotente(self, coleta_id, **dados):
-        """Cria coleta apenas se coleta_id ainda não existe (idempotência)."""
         return self.get_or_create(coleta_id=coleta_id, defaults=dados)
