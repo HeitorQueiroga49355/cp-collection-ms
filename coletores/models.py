@@ -5,6 +5,8 @@ from django.db import models
 class Coletor(AbstractUser):
     nome = models.CharField('nome completo', max_length=150, blank=True)
     foto_perfil = models.URLField('foto de perfil', blank=True)
+    zona = models.CharField('zona', max_length=100, blank=True)
+    cargo = models.CharField('cargo', max_length=100, blank=True, default='Agente de coleta')
     ativo = models.BooleanField('ativo', default=True)
     criado_em = models.DateTimeField('criado em', auto_now_add=True)
 
@@ -15,3 +17,7 @@ class Coletor(AbstractUser):
 
     def __str__(self):
         return self.nome or self.username
+
+    @property
+    def matricula(self):
+        return self.username
