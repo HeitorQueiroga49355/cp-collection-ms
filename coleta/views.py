@@ -19,6 +19,7 @@ from .serializers import (
     ImovelDetailSerializer,
     RotaImovelSerializer,
 )
+from .services.fila import publicar_coleta
 
 
 def _hoje():
@@ -226,6 +227,16 @@ class ColetaCreateView(APIView):
                 parada.status = RotaImovel.Status.COLETADO
                 parada.save(update_fields=['status'])
 
+        enviado = publicar_coleta(
+            coleta_id=str(coleta.coleta_id),
+            imovel_id=str(coleta.imovel_id),
+            peso_total_kg=str(coleta.peso_total_kg),
+        )
+        coleta.sincronizado_core = enviado
+        coleta.tentativas_sincronizacao = 1
+        coleta.erro_ultima_tentativa = '' if enviado else 'Falha ao publicar na fila RabbitMQ'
+        coleta.save(update_fields=['sincronizado_core', 'tentativas_sincronizacao', 'erro_ultima_tentativa'])
+
         return Response(ColetaOutputSerializer(coleta).data, status=status.HTTP_201_CREATED)
 
 
@@ -359,6 +370,16 @@ class SincronizarView(APIView):
                     )
                     for m in materiais_data:
                         MaterialColeta.objects.create(coleta=coleta, tipo=m['tipo'], peso_kg=m['peso_kg'])
+
+                enviado = publicar_coleta(
+                    coleta_id=str(coleta.coleta_id),
+                    imovel_id=str(coleta.imovel_id),
+                    peso_total_kg=str(coleta.peso_total_kg),
+                )
+                coleta.sincronizado_core = enviado
+                coleta.tentativas_sincronizacao = 1
+                coleta.erro_ultima_tentativa = '' if enviado else 'Falha ao publicar na fila RabbitMQ'
+                coleta.save(update_fields=['sincronizado_core', 'tentativas_sincronizacao', 'erro_ultima_tentativa'])
 
                 resultados.append({
                     'offline_id': offline_id,

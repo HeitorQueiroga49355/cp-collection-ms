@@ -7,34 +7,39 @@ import pika
 logger = logging.getLogger(__name__)
 
 
-def publicar_pesagem(pesagem_data: dict) -> bool:
+def publicar_coleta(coleta_id: str, imovel_id: str, peso_total_kg: str) -> bool:
+    payload = {
+        'coleta_id': coleta_id,
+        'imovel_id': imovel_id,
+        'peso_total_kg': peso_total_kg,
+    }
     try:
         credentials = pika.PlainCredentials(
             username=os.getenv('RABBITMQ_DEFAULT_USER', 'guest'),
             password=os.getenv('RABBITMQ_DEFAULT_PASS', 'guest'),
         )
         parametros = pika.ConnectionParameters(
-            host='rabbitmq',
-            port=5672,
+            host=os.getenv('RABBITMQ_HOST', 'rabbitmq'),
+            port=int(os.getenv('RABBITMQ_PORT', 5672)),
             credentials=credentials,
         )
 
         conexao = pika.BlockingConnection(parametros)
         canal = conexao.channel()
 
-        canal.queue_declare(queue='pesagens', durable=True)
+        canal.queue_declare(queue='coletas', durable=True)
 
         canal.basic_publish(
             exchange='',
-            routing_key='pesagens',
-            body=json.dumps(pesagem_data, default=str),
+            routing_key='coletas',
+            body=json.dumps(payload, default=str),
             properties=pika.BasicProperties(delivery_mode=2),
         )
 
         conexao.close()
-        logger.info(f"Pesagem publicada na fila: {pesagem_data}")
+        logger.info(f"Coleta publicada na fila: {payload}")
         return True
 
     except Exception as e:
-        logger.error(f"Erro ao publicar na fila: {e}")
+        logger.error(f"Erro ao publicar coleta na fila: {e}")
         return False

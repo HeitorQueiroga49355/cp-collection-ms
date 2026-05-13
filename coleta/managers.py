@@ -8,9 +8,12 @@ class ImovelManager(models.Manager):
             'id_externo': payload.get('id_externo', ''),
             'logradouro': payload.get('logradouro', ''),
             'numero': payload.get('numero', ''),
+            'complemento': payload.get('complemento', ''),
             'bairro': payload.get('bairro', ''),
             'morador': payload.get('morador', ''),
+            'telefone': payload.get('telefone', ''),
             'elegivel': payload.get('elegivel', True),
+            'motivo_inelegivel': payload.get('motivo_inelegivel', ''),
             'ativo': payload.get('ativo', True),
         }
         return self.update_or_create(iptu=iptu, defaults=defaults)
