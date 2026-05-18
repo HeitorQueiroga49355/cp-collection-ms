@@ -1,0 +1,340 @@
+{
+  "_type": "export",
+  "__export_format": 4,
+  "__export_date": "2026-05-15",
+  "__export_source": "cp-collection-ms",
+  "resources": [
+    {
+      "_id": "wrk_cp_collection",
+      "_type": "workspace",
+      "name": "cp-collection-ms",
+      "description": "API do microserviço de coleta seletiva",
+      "scope": "collection"
+    },
+    {
+      "_id": "env_base",
+      "_type": "environment",
+      "parentId": "wrk_cp_collection",
+      "name": "Base",
+      "data": {
+        "base_url": "http://localhost:8000/api",
+        "token": ""
+      },
+      "color": null,
+      "isPrivate": false
+    },
+
+    {
+      "_id": "fld_auth",
+      "_type": "request_group",
+      "parentId": "wrk_cp_collection",
+      "name": "1. Auth",
+      "description": "Registro, login e logout. Execute Register ou Login primeiro para obter o token."
+    },
+    {
+      "_id": "req_register",
+      "_type": "request",
+      "parentId": "fld_auth",
+      "name": "Register",
+      "method": "POST",
+      "url": "{{ base_url }}/auth/register",
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"matricula\": \"MAT001\",\n  \"senha\": \"Senha@123\",\n  \"nome\": \"João Silva\",\n  \"email\": \"joao@prefeitura.gov.br\",\n  \"zona\": \"Norte\",\n  \"cargo\": \"Agente de coleta\"\n}"
+      },
+      "authentication": {}
+    },
+    {
+      "_id": "req_login",
+      "_type": "request",
+      "parentId": "fld_auth",
+      "name": "Login",
+      "method": "POST",
+      "url": "{{ base_url }}/auth/login",
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"matricula\": \"MAT001\",\n  \"senha\": \"Senha@123\"\n}"
+      },
+      "authentication": {},
+      "description": "Salve o valor de `token` retornado na variável de ambiente `token`."
+    },
+    {
+      "_id": "req_logout",
+      "_type": "request",
+      "parentId": "fld_auth",
+      "name": "Logout",
+      "method": "POST",
+      "url": "{{ base_url }}/auth/logout",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{ token }}" },
+        { "name": "Content-Type", "value": "application/json" }
+      ],
+      "body": { "mimeType": "application/json", "text": "{}" },
+      "authentication": {}
+    },
+
+    {
+      "_id": "fld_me",
+      "_type": "request_group",
+      "parentId": "wrk_cp_collection",
+      "name": "2. Perfil",
+      "description": "Dados do coletor autenticado. Use para confirmar o token e obter rota_hoje."
+    },
+    {
+      "_id": "req_me",
+      "_type": "request",
+      "parentId": "fld_me",
+      "name": "Me (perfil)",
+      "method": "GET",
+      "url": "{{ base_url }}/me",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{ token }}" }
+      ],
+      "body": {},
+      "authentication": {},
+      "description": "Retorna o perfil do coletor e, se existir, rota_hoje com o id da rota do dia."
+    },
+
+    {
+      "_id": "fld_rotas",
+      "_type": "request_group",
+      "parentId": "wrk_cp_collection",
+      "name": "3. Rotas",
+      "description": "Consulta rota do dia e paradas. Obtenha o id da rota via GET /me ou GET /rotas/hoje."
+    },
+    {
+      "_id": "req_rota_hoje",
+      "_type": "request",
+      "parentId": "fld_rotas",
+      "name": "Rota de Hoje",
+      "method": "GET",
+      "url": "{{ base_url }}/rotas/hoje",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{ token }}" }
+      ],
+      "body": {},
+      "authentication": {},
+      "description": "Retorna resumo da rota do dia: progresso, próximo imóvel, totais de kg e pontos."
+    },
+    {
+      "_id": "req_rota_paradas",
+      "_type": "request",
+      "parentId": "fld_rotas",
+      "name": "Paradas da Rota",
+      "method": "GET",
+      "url": "{{ base_url }}/rotas/:rota_id/paradas",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{ token }}" }
+      ],
+      "parameters": [
+        { "name": "page", "value": "1" },
+        { "name": "limit", "value": "20" }
+      ],
+      "pathParameters": [
+        { "name": "rota_id", "value": "SUBSTITUA_PELO_ID_DA_ROTA" }
+      ],
+      "body": {},
+      "authentication": {},
+      "description": "Lista paginada das paradas. Substitua :rota_id pelo id retornado em /rotas/hoje ou /me."
+    },
+
+    {
+      "_id": "fld_imoveis",
+      "_type": "request_group",
+      "parentId": "wrk_cp_collection",
+      "name": "4. Imóveis",
+      "description": "Busca e detalhes de imóveis. Use o id do imóvel para registrar coletas."
+    },
+    {
+      "_id": "req_imovel_buscar_numero",
+      "_type": "request",
+      "parentId": "fld_imoveis",
+      "name": "Buscar por Número IPTU",
+      "method": "GET",
+      "url": "{{ base_url }}/imoveis/buscar",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{ token }}" }
+      ],
+      "parameters": [
+        { "name": "tipo", "value": "numero" },
+        { "name": "valor", "value": "1234567890" }
+      ],
+      "body": {},
+      "authentication": {}
+    },
+    {
+      "_id": "req_imovel_buscar_qrcode",
+      "_type": "request",
+      "parentId": "fld_imoveis",
+      "name": "Buscar por QR Code",
+      "method": "GET",
+      "url": "{{ base_url }}/imoveis/buscar",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{ token }}" }
+      ],
+      "parameters": [
+        { "name": "tipo", "value": "qrcode" },
+        { "name": "valor", "value": "EXT-ABC-001" }
+      ],
+      "body": {},
+      "authentication": {}
+    },
+    {
+      "_id": "req_imovel_buscar_endereco",
+      "_type": "request",
+      "parentId": "fld_imoveis",
+      "name": "Buscar por Endereço",
+      "method": "GET",
+      "url": "{{ base_url }}/imoveis/buscar",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{ token }}" }
+      ],
+      "parameters": [
+        { "name": "tipo", "value": "endereco" },
+        { "name": "valor", "value": "Rua das Flores" },
+        { "name": "rota_id", "value": "" }
+      ],
+      "body": {},
+      "authentication": {},
+      "description": "rota_id é opcional: filtra apenas imóveis da rota informada."
+    },
+    {
+      "_id": "req_imovel_detail",
+      "_type": "request",
+      "parentId": "fld_imoveis",
+      "name": "Detalhe do Imóvel",
+      "method": "GET",
+      "url": "{{ base_url }}/imoveis/:imovel_id",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{ token }}" }
+      ],
+      "pathParameters": [
+        { "name": "imovel_id", "value": "SUBSTITUA_PELO_ID_DO_IMOVEL" }
+      ],
+      "body": {},
+      "authentication": {},
+      "description": "Retorna dados completos do imóvel incluindo histórico de coletas e elegibilidade."
+    },
+
+    {
+      "_id": "fld_coletas",
+      "_type": "request_group",
+      "parentId": "wrk_cp_collection",
+      "name": "5. Coletas",
+      "description": "Registro e consulta de coletas. Tenha o imovel_id em mãos antes de criar uma coleta."
+    },
+    {
+      "_id": "req_coleta_create",
+      "_type": "request",
+      "parentId": "fld_coletas",
+      "name": "Criar Coleta",
+      "method": "POST",
+      "url": "{{ base_url }}/coletas",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{ token }}" },
+        { "name": "Content-Type", "value": "application/json" }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"imovel_id\": \"SUBSTITUA_PELO_ID_DO_IMOVEL\",\n  \"data_hora\": \"2026-05-15T08:30:00-03:00\",\n  \"materiais\": [\n    { \"tipo\": \"plastico\", \"peso_kg\": 2.500 },\n    { \"tipo\": \"papel\", \"peso_kg\": 1.200 }\n  ],\n  \"gps\": {\n    \"latitude\": -23.5505,\n    \"longitude\": -46.6333\n  },\n  \"foto_url\": null,\n  \"observacoes\": \"\",\n  \"offline_id\": null\n}"
+      },
+      "authentication": {},
+      "description": "Tipos de material aceitos: plastico | papel | vidro | metal | organico. offline_id é UUID gerado pelo app para idempotência offline."
+    },
+    {
+      "_id": "req_coleta_detail",
+      "_type": "request",
+      "parentId": "fld_coletas",
+      "name": "Detalhe da Coleta",
+      "method": "GET",
+      "url": "{{ base_url }}/coletas/:coleta_id",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{ token }}" }
+      ],
+      "pathParameters": [
+        { "name": "coleta_id", "value": "SUBSTITUA_PELO_ID_DA_COLETA" }
+      ],
+      "body": {},
+      "authentication": {}
+    },
+    {
+      "_id": "req_coleta_historico",
+      "_type": "request",
+      "parentId": "fld_coletas",
+      "name": "Histórico de Coletas",
+      "method": "GET",
+      "url": "{{ base_url }}/coletas/historico",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{ token }}" }
+      ],
+      "parameters": [
+        { "name": "tipo_periodo", "value": "hoje", "description": "hoje | ontem | semana | mes" },
+        { "name": "page", "value": "1" },
+        { "name": "limit", "value": "30" }
+      ],
+      "body": {},
+      "authentication": {},
+      "description": "tipo_periodo: hoje | ontem | semana | mes. Pode usar data=YYYY-MM-DD no lugar de tipo_periodo."
+    },
+    {
+      "_id": "req_coleta_pendentes",
+      "_type": "request",
+      "parentId": "fld_coletas",
+      "name": "Coletas Pendentes (não sincronizadas)",
+      "method": "GET",
+      "url": "{{ base_url }}/coletas/pendentes",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{ token }}" }
+      ],
+      "body": {},
+      "authentication": {},
+      "description": "Lista coletas que ainda não foram sincronizadas com o core (sincronizado_core=false)."
+    },
+
+    {
+      "_id": "fld_sincronizacao",
+      "_type": "request_group",
+      "parentId": "wrk_cp_collection",
+      "name": "6. Sincronização",
+      "description": "Envio em lote de coletas offline e consulta de status de sincronização."
+    },
+    {
+      "_id": "req_sincronizar",
+      "_type": "request",
+      "parentId": "fld_sincronizacao",
+      "name": "Sincronizar Coletas (batch)",
+      "method": "POST",
+      "url": "{{ base_url }}/sincronizar",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{ token }}" },
+        { "name": "Content-Type", "value": "application/json" }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"coletas\": [\n    {\n      \"offline_id\": \"550e8400-e29b-41d4-a716-446655440000\",\n      \"imovel_id\": \"SUBSTITUA_PELO_ID_DO_IMOVEL\",\n      \"data_hora\": \"2026-05-15T07:15:00-03:00\",\n      \"materiais\": [\n        { \"tipo\": \"metal\", \"peso_kg\": 3.000 },\n        { \"tipo\": \"vidro\", \"peso_kg\": 1.800 }\n      ],\n      \"gps\": {\n        \"latitude\": -23.5505,\n        \"longitude\": -46.6333\n      },\n      \"foto_url\": null\n    }\n  ]\n}"
+      },
+      "authentication": {},
+      "description": "Retorna 200 se tudo sincronizou, 207 se houve erros parciais."
+    },
+    {
+      "_id": "req_sincronizacao_status",
+      "_type": "request",
+      "parentId": "fld_sincronizacao",
+      "name": "Status de Sincronização",
+      "method": "GET",
+      "url": "{{ base_url }}/sincronizacao/status",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{ token }}" }
+      ],
+      "body": {},
+      "authentication": {},
+      "description": "Retorna pendentes, sincronizadas_hoje e última sincronização bem-sucedida."
+    }
+  ]
+}
