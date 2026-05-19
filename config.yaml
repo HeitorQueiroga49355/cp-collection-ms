@@ -1,0 +1,129 @@
+# =============================================================================
+# Configuração do test_integration.py
+# =============================================================================
+# Todos os valores podem ser sobrescritos via variáveis de ambiente (ver .env).
+# =============================================================================
+
+# Em caso de falha, o script imprime um bloco DIAGNOSTIC <<<EOF ... EOF
+# no terminal — o Claude Code (rodando na mesma sessão) lê esse bloco
+# e propõe a correção. Não há chamada a API externa de IA.
+
+# -----------------------------------------------------------------------------
+# Serviços (URLs expostas no host — não os hostnames internos dos containers)
+# -----------------------------------------------------------------------------
+services:
+  core:
+    base_url: http://localhost:8001
+    container: coleta-premiada-core-1
+    # Endpoints — caminhos relativos ao base_url
+    endpoints:
+      admin:           /admin/login/         # health check (200/302)
+      token:           /api/token/           # POST {email, password} → {access, refresh}
+      token_refresh:   /api/token/refresh/
+      me:              /api/accounts/auth/me
+      properties:      /api/program/properties
+      collections:     /api/collection/collections
+
+  microservice:
+    base_url: http://localhost:8002
+    container: coleta-ms-app
+    endpoints:
+      admin:                /admin/login/
+      register:             /api/auth/register
+      login:                /api/auth/login
+      me:                   /api/me
+      coletas:              /api/coletas
+      coleta_detail:        /api/coletas/{id}
+      imovel_buscar:        /api/imoveis/buscar
+      imovel_detail:        /api/imoveis/{id}
+      pendentes:            /api/coletas/pendentes
+      sincronizacao_status: /api/sincronizacao/status
+
+# -----------------------------------------------------------------------------
+# Mensageria — RabbitMQ (a mesma instância usada pelos dois serviços)
+# -----------------------------------------------------------------------------
+rabbitmq:
+  host: localhost
+  port: 5672
+  user: guest
+  password: guest
+  management_url: http://localhost:15672
+  queues:
+    # Core publica → Microsserviço consome  (signal post_save Imovel)
+    imoveis:
+      publisher: core
+      consumer: microservice
+    # Microsserviço publica → Core consome  (POST /api/coletas)
+    coletas:
+      publisher: microservice
+      consumer: core
+
+# -----------------------------------------------------------------------------
+# Bancos de dados (somente para health-checks TCP)
+# -----------------------------------------------------------------------------
+databases:
+  mongodb:
+    host: localhost
+    port: 27017
+    container: coleta-mongodb
+  postgres:
+    host: localhost
+    port: 5433
+    container: coleta-premiada-postgres-1
+
+# -----------------------------------------------------------------------------
+# Credenciais de teste
+# -----------------------------------------------------------------------------
+# Core — usuário morador (será criado via `docker exec` se não existir).
+core_user:
+  email: integration.morador@coletapremiada.test
+  password: senha_integration_2026!
+  nome: Morador Integração
+  cpf: "111.222.333-44"
+  perfil: morador
+
+# Microsserviço — coletor (será registrado via /api/auth/register se não existir).
+ms_user:
+  matricula: COL-INT-001
+  password: senha_integration_2026!
+  nome: Coletor Integração
+  email: integration.coletor@coletapremiada.test
+  zona: Centro
+  cargo: Agente de coleta
+
+# -----------------------------------------------------------------------------
+# Payloads de teste
+# -----------------------------------------------------------------------------
+imovel_payload:
+  # inscricao é gerada dinamicamente (TEST-INT-<timestamp>)
+  cep: "59900-000"
+  logradouro: Rua da Integração
+  numero: "42"
+  complemento: Apto 1
+  bairro: Centro
+  cidade: Pau dos Ferros
+  estado: RN
+  num_moradores: 2
+  ativo: true
+
+coleta_payload:
+  # imovel_id é definido em tempo de execução (após a fila 'imoveis' propagar)
+  materiais:
+    - tipo: plastico
+      peso_kg: "1.500"
+    - tipo: papel
+      peso_kg: "1.000"
+  foto_url: "https://exemplo.test/foto.jpg"
+  gps:
+    latitude: -6.1086
+    longitude: -38.2089
+  observacoes: "Coleta gerada pelo test_integration.py"
+
+# -----------------------------------------------------------------------------
+# Tempos de espera (segundos)
+# -----------------------------------------------------------------------------
+timeouts:
+  http_request:        15
+  rabbit_propagation:   8   # espera após publicar p/ o consumer processar
+  service_warmup:       3
+  retries: 3

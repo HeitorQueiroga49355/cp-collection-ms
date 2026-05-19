@@ -7,7 +7,6 @@ from .views import (
     ColetaPendentesView,
     ImovelBuscarView,
     ImovelDetailView,
-    MateriaisView,
     RotaHojeView,
     RotaParadasView,
     SincronizacaoStatusView,

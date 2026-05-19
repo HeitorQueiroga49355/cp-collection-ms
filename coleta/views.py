@@ -228,9 +228,11 @@ class ColetaCreateView(APIView):
                 parada.save(update_fields=['status'])
 
         enviado = publicar_coleta(
-            coleta_id=str(coleta.coleta_id),
-            imovel_id=str(coleta.imovel_id),
+            coleta_id=str(coleta.id),
+            inscricao_imobiliaria=coleta.imovel.id_externo,
+            pontuacao=str(coleta.pontos_gerados),
             peso_total_kg=str(coleta.peso_total_kg),
+            data_hora=coleta.data_hora.isoformat(),
         )
         coleta.sincronizado_core = enviado
         coleta.tentativas_sincronizacao = 1
@@ -372,9 +374,11 @@ class SincronizarView(APIView):
                         MaterialColeta.objects.create(coleta=coleta, tipo=m['tipo'], peso_kg=m['peso_kg'])
 
                 enviado = publicar_coleta(
-                    coleta_id=str(coleta.coleta_id),
-                    imovel_id=str(coleta.imovel_id),
+                    coleta_id=str(coleta.id),
+                    inscricao_imobiliaria=coleta.imovel.id_externo,
+                    pontuacao=str(coleta.pontos_gerados),
                     peso_total_kg=str(coleta.peso_total_kg),
+                    data_hora=coleta.data_hora.isoformat(),
                 )
                 coleta.sincronizado_core = enviado
                 coleta.tentativas_sincronizacao = 1
@@ -411,10 +415,17 @@ class SincronizacaoStatusView(APIView):
 
     def get(self, request):
         pendentes_qs = Coleta.objects.filter(coletor=request.user, sincronizado_core=False)
+        
+        hoje = _hoje()
+        from datetime import datetime, time
+        hoje_inicio = datetime.combine(hoje, time.min)
+        hoje_fim = datetime.combine(hoje, time.max)
+
         sincronizadas_hoje = Coleta.objects.filter(
             coletor=request.user,
             sincronizado_core=True,
-            data_hora__date=_hoje(),
+            data_hora__gte=hoje_inicio,
+            data_hora__lte=hoje_fim,
         ).count()
 
         ultima = Coleta.objects.filter(

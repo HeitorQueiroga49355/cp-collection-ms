@@ -3,20 +3,22 @@ from django.db import models
 
 class ImovelManager(models.Manager):
     def upsert_from_evento(self, payload: dict):
-        iptu = payload['iptu']
+        inscricao = payload['inscricao_imobiliaria']
         defaults = {
-            'id_externo': payload.get('id_externo', ''),
-            'logradouro': payload.get('logradouro', ''),
+            # O Core ainda não envia IPTU; usa a inscrição como placeholder
+            # para satisfazer a unicidade do campo.
+            'iptu': payload.get('iptu') or inscricao,
+            'logradouro': payload.get('endereco', ''),
             'numero': payload.get('numero', ''),
             'complemento': payload.get('complemento', ''),
             'bairro': payload.get('bairro', ''),
-            'morador': payload.get('morador', ''),
+            'morador': payload.get('nome', ''),
             'telefone': payload.get('telefone', ''),
             'elegivel': payload.get('elegivel', True),
             'motivo_inelegivel': payload.get('motivo_inelegivel', ''),
             'ativo': payload.get('ativo', True),
         }
-        return self.update_or_create(iptu=iptu, defaults=defaults)
+        return self.update_or_create(id_externo=inscricao, defaults=defaults)
 
 
 class ColetaManager(models.Manager):

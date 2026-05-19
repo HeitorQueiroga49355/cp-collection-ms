@@ -72,7 +72,7 @@ DATABASES = {
         'ENGINE': 'django_mongodb_backend',
         'NAME': os.getenv('MONGO_INITDB_DATABASE', 'coleta_db'),
         'ENFORCE_SCHEMA': False,
-        'HOST': 'localhost',
+        'HOST': os.getenv('MONGO_HOST', 'localhost'),
         'PORT': 27017,
         'USER': os.getenv('MONGO_USER'),
         'PASSWORD': os.getenv('MONGO_PASSWORD'),
@@ -84,6 +84,13 @@ DATABASES = {
 
 DEFAULT_AUTO_FIELD = 'django_mongodb_backend.fields.ObjectIdAutoField'
 AUTH_USER_MODEL = 'coletores.Coletor'
+
+MIGRATION_MODULES = {
+    'admin': 'mongo_migrations.admin',
+    'auth': 'mongo_migrations.auth',
+    'contenttypes': 'mongo_migrations.contenttypes',
+}
+
 LANGUAGE_CODE = 'pt-br'
 TIME_ZONE = 'America/Fortaleza'
 USE_TZ = True

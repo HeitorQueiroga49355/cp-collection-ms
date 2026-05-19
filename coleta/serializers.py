@@ -8,6 +8,7 @@ from .models import Coleta, Imovel, MaterialColeta, Rota, RotaImovel
 # ─── Imovel ───────────────────────────────────────────────────────────────────
 
 class ImovelResumoSerializer(serializers.ModelSerializer):
+    id = serializers.CharField(read_only=True)
     numero_iptu = serializers.CharField(source='iptu')
     endereco = serializers.SerializerMethodField()
 
@@ -20,6 +21,7 @@ class ImovelResumoSerializer(serializers.ModelSerializer):
 
 
 class ImovelBuscarSerializer(serializers.ModelSerializer):
+    id = serializers.CharField(read_only=True)
     numero_iptu = serializers.CharField(source='iptu')
     endereco = serializers.SerializerMethodField()
     numero_endereco = serializers.CharField(source='numero')
@@ -47,6 +49,7 @@ class ImovelBuscarSerializer(serializers.ModelSerializer):
 
 
 class ImovelDetailSerializer(serializers.ModelSerializer):
+    id = serializers.CharField(read_only=True)
     numero_iptu = serializers.CharField(source='iptu')
     endereco = serializers.SerializerMethodField()
     numero_endereco = serializers.CharField(source='numero')
@@ -116,6 +119,7 @@ class ColetaInputSerializer(serializers.Serializer):
 
 
 class ColetaOutputSerializer(serializers.ModelSerializer):
+    id = serializers.CharField(read_only=True)
     imovel_id = serializers.CharField(source='imovel.id')
     coletor_id = serializers.CharField(source='coletor.id')
     materiais = MaterialColetaSerializer(many=True)
@@ -141,6 +145,7 @@ class ColetaOutputSerializer(serializers.ModelSerializer):
 
 
 class ColetaHistoricoItemSerializer(serializers.ModelSerializer):
+    id = serializers.CharField(read_only=True)
     imovel = ImovelResumoSerializer()
     material_principal = serializers.SerializerMethodField()
     peso_kg = serializers.DecimalField(source='peso_total_kg', max_digits=8, decimal_places=1)
@@ -164,6 +169,7 @@ class ColetaHistoricoItemSerializer(serializers.ModelSerializer):
 
 
 class ColetaDetailSerializer(serializers.ModelSerializer):
+    id = serializers.CharField(read_only=True)
     imovel = serializers.SerializerMethodField()
     coletor = serializers.SerializerMethodField()
     materiais = MaterialColetaSerializer(many=True)
@@ -208,6 +214,7 @@ class ColetaDetailSerializer(serializers.ModelSerializer):
 # ─── Rota ─────────────────────────────────────────────────────────────────────
 
 class RotaImovelSerializer(serializers.ModelSerializer):
+    id = serializers.CharField(read_only=True)
     numero_iptu = serializers.CharField(source='imovel.iptu')
     endereco = serializers.SerializerMethodField()
     bairro = serializers.CharField(source='imovel.bairro')

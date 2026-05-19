@@ -16,11 +16,13 @@ class Command(BaseCommand):
             return
 
         enviadas = 0
-        for coleta in pendentes:
+        for coleta in pendentes.select_related('imovel'):
             enviado = publicar_coleta(
                 coleta_id=str(coleta.coleta_id),
-                imovel_id=str(coleta.imovel_id),
+                inscricao_imobiliaria=coleta.imovel.id_externo,
+                pontuacao=str(coleta.pontos_gerados),
                 peso_total_kg=str(coleta.peso_total_kg),
+                data_hora=coleta.data_hora.isoformat(),
             )
             coleta.tentativas_sincronizacao += 1
             coleta.sincronizado_core = enviado

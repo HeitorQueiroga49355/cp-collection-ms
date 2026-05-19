@@ -18,8 +18,8 @@ def _callback(canal, method, _properties, body):
         canal.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
         return
 
-    if 'iptu' not in payload:
-        logger.error(f"Mensagem sem campo 'iptu' — descartando: {payload}")
+    if not payload.get('inscricao_imobiliaria'):
+        logger.error(f"Mensagem sem 'inscricao_imobiliaria' — descartando: {payload}")
         canal.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
         return
 
@@ -27,12 +27,18 @@ def _callback(canal, method, _properties, body):
         from coleta.models import Imovel
 
         imovel, criado = Imovel.objects.upsert_from_evento(payload)
-        acao = 'criado' if criado else 'atualizado'
-        logger.info(f"Imóvel {acao}: IPTU={imovel.iptu}")
+        acao_log = 'criado' if criado else 'atualizado'
+        logger.info(
+            f"Imóvel {acao_log}: id_externo={imovel.id_externo} "
+            f"(acao={payload.get('acao', '-')})"
+        )
         canal.basic_ack(delivery_tag=method.delivery_tag)
 
     except Exception as e:
-        logger.error(f"Erro ao processar imóvel (iptu={payload.get('iptu')}): {e}")
+        logger.error(
+            f"Erro ao processar imóvel "
+            f"(inscricao={payload.get('inscricao_imobiliaria')}): {e}"
+        )
         canal.basic_nack(delivery_tag=method.delivery_tag, requeue=True)
 
 

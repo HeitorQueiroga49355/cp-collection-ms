@@ -2,6 +2,7 @@
 
 import django.contrib.auth.models
 import django.contrib.auth.validators
+import django.db.models.deletion
 import django.utils.timezone
 import django_mongodb_backend.fields
 from django.db import migrations, models
@@ -12,12 +13,45 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ('auth', '0001_initial'),
+        ('contenttypes', '0001_initial'),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='Coletor',
+            name='Permission',
+            fields=[
+                ('id', django_mongodb_backend.fields.ObjectIdAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('name', models.CharField(max_length=255, verbose_name='name')),
+                ('codename', models.CharField(max_length=100, verbose_name='codename')),
+                ('content_type', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='contenttypes.contenttype', verbose_name='content type')),
+            ],
+            options={
+                'verbose_name': 'permission',
+                'verbose_name_plural': 'permissions',
+                'ordering': ['content_type__app_label', 'content_type__model', 'codename'],
+                'unique_together': {('content_type', 'codename')},
+            },
+            managers=[
+                ('objects', django.contrib.auth.models.PermissionManager()),
+            ],
+        ),
+        migrations.CreateModel(
+            name='Group',
+            fields=[
+                ('id', django_mongodb_backend.fields.ObjectIdAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('name', models.CharField(max_length=150, unique=True, verbose_name='name')),
+                ('permissions', models.ManyToManyField(blank=True, to='auth.permission', verbose_name='permissions')),
+            ],
+            options={
+                'verbose_name': 'group',
+                'verbose_name_plural': 'groups',
+            },
+            managers=[
+                ('objects', django.contrib.auth.models.GroupManager()),
+            ],
+        ),
+        migrations.CreateModel(
+            name='User',
             fields=[
                 ('id', django_mongodb_backend.fields.ObjectIdAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('password', models.CharField(max_length=128, verbose_name='password')),
@@ -30,19 +64,14 @@ class Migration(migrations.Migration):
                 ('is_staff', models.BooleanField(default=False, help_text='Designates whether the user can log into this admin site.', verbose_name='staff status')),
                 ('is_active', models.BooleanField(default=True, help_text='Designates whether this user should be treated as active. Unselect this instead of deleting accounts.', verbose_name='active')),
                 ('date_joined', models.DateTimeField(default=django.utils.timezone.now, verbose_name='date joined')),
-                ('nome', models.CharField(blank=True, max_length=150, verbose_name='nome completo')),
-                ('foto_perfil', models.URLField(blank=True, verbose_name='foto de perfil')),
-                ('zona', models.CharField(blank=True, max_length=100, verbose_name='zona')),
-                ('cargo', models.CharField(blank=True, default='Agente de coleta', max_length=100, verbose_name='cargo')),
-                ('ativo', models.BooleanField(default=True, verbose_name='ativo')),
-                ('criado_em', models.DateTimeField(auto_now_add=True, verbose_name='criado em')),
                 ('groups', models.ManyToManyField(blank=True, help_text='The groups this user belongs to. A user will get all permissions granted to each of their groups.', related_name='user_set', related_query_name='user', to='auth.group', verbose_name='groups')),
                 ('user_permissions', models.ManyToManyField(blank=True, help_text='Specific permissions for this user.', related_name='user_set', related_query_name='user', to='auth.permission', verbose_name='user permissions')),
             ],
             options={
-                'verbose_name': 'coletor',
-                'verbose_name_plural': 'coletores',
-                'ordering': ['nome'],
+                'verbose_name': 'user',
+                'verbose_name_plural': 'users',
+                'abstract': False,
+                'swappable': 'AUTH_USER_MODEL',
             },
             managers=[
                 ('objects', django.contrib.auth.models.UserManager()),

@@ -7,11 +7,19 @@ import pika
 logger = logging.getLogger(__name__)
 
 
-def publicar_coleta(coleta_id: str, imovel_id: str, peso_total_kg: str) -> bool:
+def publicar_coleta(
+    coleta_id: str,
+    inscricao_imobiliaria: str,
+    pontuacao: str,
+    peso_total_kg: str,
+    data_hora: str,
+) -> bool:
     payload = {
         'coleta_id': coleta_id,
-        'imovel_id': imovel_id,
+        'inscricao_imobiliaria': inscricao_imobiliaria,
+        'pontuacao': pontuacao,
         'peso_total_kg': peso_total_kg,
+        'data_hora': data_hora,
     }
     try:
         credentials = pika.PlainCredentials(

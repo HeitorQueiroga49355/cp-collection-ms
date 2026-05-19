@@ -3,8 +3,10 @@
 Ferramenta de teste interativo para as filas RabbitMQ do cp-collection-ms.
 
 Filas cobertas:
-  • coletas  — publicada por este serviço (coleta_id / imovel_id / peso_total_kg)
-  • imoveis  — consumida por este serviço (dados do imóvel vindos de outro MS)
+  • coletas  — publicada por este serviço → consumida pelo Coleta-Premiada Core
+               campos: id / imovel_id / pontuacao / data_hora / material / peso_kg
+  • imoveis  — consumida por este serviço ← publicada pelo Coleta-Premiada Core
+               campos: inscricao_imobiliaria / nome / cpf / endereco / acao
 """
 import json
 import sys
@@ -125,17 +127,22 @@ def menu_testar_conexao():
 # ─── 3. Publicar na fila 'coletas' ────────────────────────────────────────────
 
 def menu_publicar_coleta():
-    title("Publicar mensagem → fila 'coletas'")
+    title("Publicar mensagem → fila 'coletas'  (consumida pelo Coleta-Premiada Core)")
     info("Preencha os campos (Enter = usar valor padrão):")
+    info("Campos: coleta_id / imovel_id / pontuacao / peso_total_kg / data_hora")
 
-    coleta_id  = pedir("coleta_id (UUID)", str(uuid.uuid4()))
-    imovel_id  = pedir("imovel_id", "imovel-001")
-    peso       = pedir_float("peso_total_kg", 12.5)
+    coleta_id     = pedir("coleta_id (UUID da coleta gerado pelo ms)", str(uuid.uuid4()))
+    imovel_id     = pedir("imovel_id (PK do Imovel no banco do ms)", "1")
+    pontuacao     = pedir("pontuacao (pontos gerados pela coleta)", "18.50")
+    peso_total_kg = pedir("peso_total_kg (soma de todos os materiais coletados)", "2.5")
+    data_hora     = pedir("data_hora (formato ISO 8601 com fuso)", datetime.now().strftime("%Y-%m-%dT%H:%M:%S-03:00"))
 
     payload = {
-        "coleta_id":    coleta_id,
-        "imovel_id":    imovel_id,
-        "peso_total_kg": peso,
+        "coleta_id":     coleta_id,
+        "imovel_id":     imovel_id,
+        "pontuacao":     pontuacao,
+        "peso_total_kg": peso_total_kg,
+        "data_hora":     data_hora,
     }
 
     print(f"\n  Payload: {json.dumps(payload, indent=4, ensure_ascii=False)}")
@@ -151,7 +158,10 @@ def menu_publicar_coleta():
             exchange="",
             routing_key="coletas",
             body=json.dumps(payload, default=str),
-            properties=pika.BasicProperties(delivery_mode=2),
+            properties=pika.BasicProperties(
+                delivery_mode=2,
+                content_type="application/json",
+            ),
         )
         conn.close()
         ok(f"Mensagem publicada em 'coletas'  [{datetime.now().strftime('%H:%M:%S')}]")
@@ -161,21 +171,16 @@ def menu_publicar_coleta():
 # ─── 4. Publicar na fila 'imoveis' ───────────────────────────────────────────
 
 def menu_publicar_imovel():
-    title("Publicar mensagem → fila 'imoveis'  (simula outro MS)")
+    title("Publicar mensagem → fila 'imoveis'  (simula Coleta-Premiada Core)")
     info("Preencha os campos (Enter = usar valor padrão):")
+    info("Disparado pelo Core quando um imóvel faz adesão ao programa.")
 
     payload = {
-        "id_externo":       pedir("id_externo",       "EXT-0001"),
-        "iptu":             pedir("iptu",              "1234567890"),
-        "logradouro":       pedir("logradouro",        "Rua das Flores"),
-        "numero":           pedir("numero",            "42"),
-        "complemento":      pedir("complemento",       ""),
-        "bairro":           pedir("bairro",            "Centro"),
-        "morador":          pedir("morador",           "João Silva"),
-        "telefone":         pedir("telefone",          "(11) 91234-5678"),
-        "elegivel":         pedir_bool("elegivel?",    True),
-        "motivo_inelegivel":pedir("motivo_inelegivel", ""),
-        "ativo":            pedir_bool("ativo?",       True),
+        "inscricao_imobiliaria": pedir("inscricao_imobiliaria", "TEST-999"),
+        "nome":                  pedir("nome (titular do imóvel)", "João Silva"),
+        "cpf":                   pedir("cpf",                    "123.456.789-00"),
+        "endereco":              pedir("endereco",               "Rua das Flores, 42 - Centro"),
+        "acao":                  pedir("acao",                   "adesao_programa"),
     }
 
     print(f"\n  Payload:\n{json.dumps(payload, indent=4, ensure_ascii=False)}")
@@ -274,8 +279,8 @@ def menu_inspecionar():
 MENU = [
     ("Configurar conexão",                       menu_configurar),
     ("Testar conexão",                            menu_testar_conexao),
-    ("Publicar coleta  → fila 'coletas'",         menu_publicar_coleta),
-    ("Publicar imóvel  → fila 'imoveis'",         menu_publicar_imovel),
+    ("Publicar coleta  → fila 'coletas'  (coleta_id/imovel_id/pontuacao/peso_total_kg/data_hora)", menu_publicar_coleta),
+    ("Publicar imóvel  → fila 'imoveis'  (inscricao/nome/cpf/endereco/acao)",      menu_publicar_imovel),
     ("Escutar fila (aguarda mensagens)",           menu_escutar),
     ("Inspecionar filas (contagem de mensagens)", menu_inspecionar),
     ("Sair",                                      None),
