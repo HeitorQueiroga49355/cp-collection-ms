@@ -1,0 +1,1834 @@
+type: collection.insomnia.rest/5.0
+schema_version: "5.1"
+name: Coleta Premiada (Core + MS)
+meta:
+  id: wrk_a2a3fde07b374197b3f8c4b735cab54d
+  created: 1779210655357
+  modified: 1779210655357
+  description: ""
+collection:
+  - name: Fluxo da Apresentação
+    meta:
+      id: fld_9adb7ae0f5114a359022d992a629422f
+      created: 1779210655359
+      modified: 1779212587878
+      sortKey: -1000
+      description: "Ordem cronológica do apresentacao_fluxo.md. Execute de cima para
+        baixo: (1) login Core, (2) login MS, (3) criar imóvel no Core, (4)
+        buscar imóvel propagado no MS, (5) criar coleta no MS, (6) checar status
+        e benefícios."
+    children:
+      - url: "{{ _.core_url }}/token/"
+        name: 1. Login Core (gestor)
+        meta:
+          id: req_03f59fdd8f55470b92c728beb68eef6b
+          created: 1779210655388
+          modified: 1779212547036
+          isPrivate: false
+          description: ""
+          sortKey: -1000
+        method: POST
+        body:
+          mimeType: application/json
+          text: |-
+            {
+              "email": "{{ _.core_email }}",
+              "password": "{{ _.core_password }}"
+            }
+        headers:
+          - name: Content-Type
+            value: application/json
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ _.ms_url }}/imoveis/buscar?tipo=qrcode&valor=6a0c9b2ebea34c81f4b2761b"
+        name: 4. MS → buscar imóvel propagado (id_externo do Core)
+        meta:
+          id: req_234c6013d8b34c96aced1d4d8826f743
+          created: 1779210655388
+          modified: 1779212558457
+          isPrivate: false
+          description: Substitua `COLE_O_ID_GERADO_NO_CORE` pelo id retornado no passo 3.
+            O MS responde com o ObjectId do Mongo — anote para o passo 5.
+          sortKey: -700
+        method: GET
+        headers:
+          - name: Authorization
+            value: Bearer {% response 'body', 'req_cb38384d913247f18f2f620baf09c3aa',
+              'b64::JC50b2tlbg==::46b', 'no-history', 60, 'never' %}
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ _.ms_url }}/auth/login"
+        name: 2. Login MS (coletor)
+        meta:
+          id: req_cb38384d913247f18f2f620baf09c3aa
+          created: 1779210655388
+          modified: 1779212550959
+          isPrivate: false
+          description: ""
+          sortKey: -900
+        method: POST
+        body:
+          mimeType: application/json
+          text: |-
+            {
+              "matricula": "{{ _.ms_matricula }}",
+              "senha": "{{ _.ms_senha }}"
+            }
+        headers:
+          - name: Content-Type
+            value: application/json
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ _.core_url }}/program/properties"
+        name: 3. Core → criar imóvel (publica na fila imoveis)
+        meta:
+          id: req_dbb5492fc89f42e390ddf865abd96164
+          created: 1779210655388
+          modified: 1779212554734
+          isPrivate: false
+          description: ""
+          sortKey: -800
+        method: POST
+        body:
+          mimeType: application/json
+          text: |-
+            {
+              "iptu": "999888777",
+              "logradouro": "Rua da Apresentação",
+              "numero": "123",
+              "bairro": "Centro",
+              "elegivel": true,
+            	"inscricao": "inscri2",
+            	"titular": 2,
+            	"cep": "95900-000",
+            	"cidade": "Pau dos Ferros",
+            	"estado": "RN"
+            }
+        headers:
+          - name: Authorization
+            value: Bearer {% response 'body', 'req_03f59fdd8f55470b92c728beb68eef6b',
+              'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}
+          - name: Content-Type
+            value: application/json
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ _.ms_url }}/coletas"
+        name: 5. MS → criar coleta (publica na fila coletas)
+        meta:
+          id: req_e511e39b1f324c1692559927852dab1f
+          created: 1779210655388
+          modified: 1779212563767
+          isPrivate: false
+          description: ""
+          sortKey: -600
+        method: POST
+        body:
+          mimeType: application/json
+          text: |-
+            {
+              "imovel_id": "6a0c9b2ebea34c81f4b2761b",
+              "data_hora": "2026-05-19T10:00:00Z",
+              "peso_total_kg": "2.5",
+              "gps": { "latitude": -6.1086, "longitude": -38.2089 }
+            }
+        headers:
+          - name: Authorization
+            value: Bearer {% response 'body', 'req_cb38384d913247f18f2f620baf09c3aa',
+              'b64::JC50b2tlbg==::46b', 'no-history', 60, 'never' %}
+          - name: Content-Type
+            value: application/json
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ _.ms_url }}/sincronizacao/status"
+        name: 6a. MS → status de sincronização
+        meta:
+          id: req_e9ac093040d5482f9a2dade8ecfd368e
+          created: 1779210655388
+          modified: 1779212567841
+          isPrivate: false
+          description: ""
+          sortKey: -500
+        method: GET
+        headers:
+          - name: Authorization
+            value: Bearer {% response 'body', 'req_cb38384d913247f18f2f620baf09c3aa',
+              'b64::JC50b2tlbg==::46b', 'no-history', 60, 'never' %}
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ _.core_url }}/program/benefits/8"
+        name: 6b. Core → benefícios do imóvel
+        meta:
+          id: req_df72a846bcbe4a0283c5537bd908e77f
+          created: 1779210655389
+          modified: 1779212572780
+          isPrivate: false
+          description: Substitua `1` pelo id do imóvel criado no passo 3.
+          sortKey: -400
+        method: GET
+        headers:
+          - name: Authorization
+            value: Bearer {% response 'body', 'req_03f59fdd8f55470b92c728beb68eef6b',
+              'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+  - name: 🟦 Core — :8001
+    meta:
+      id: fld_41be38d2de924e09be200729d653ba0a
+      created: 1779210655360
+      modified: 1779210655360
+      sortKey: -500
+      description: Sistema Core (Coleta-Premiada). Postgres + Django REST. Auth via
+        JWT (access/refresh em /api/token/).
+    children:
+      - name: 5. Coletas (Collections)
+        meta:
+          id: fld_1b67e85b6a9941cdb703a35b271a370e
+          created: 1779210655360
+          modified: 1779210655360
+          sortKey: -60
+          description: Coletas materializadas no Core. Estas são as coletas consumidas da
+            fila `coletas` (vindas do MS).
+        children:
+          - url: "{{ _.core_url }}/collection/collections"
+            name: POST /collections (criar manual — gestor)
+            meta:
+              id: req_46f68c2ecb784ca6a5d3b74bac84454b
+              created: 1779210655372
+              modified: 1779210655372
+              isPrivate: false
+              description: Entrada manual no Core (normalmente as coletas chegam via fila).
+              sortKey: -90
+            method: POST
+            body:
+              mimeType: application/json
+              text: |-
+                {
+                  "imovel": 1,
+                  "pontuacao": "3.50",
+                  "peso_total_kg": "2.50",
+                  "data_hora": "2026-05-19T10:00:00Z"
+                }
+            headers:
+              - name: Authorization
+                value: Bearer {% response 'body', 'req_0a755d9b192b463b9d77c23e484b9039',
+                  'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}
+              - name: Content-Type
+                value: application/json
+            settings:
+              renderRequestBody: true
+              encodeUrl: true
+              followRedirects: global
+              cookies:
+                send: true
+                store: true
+              rebuildPath: true
+          - url: "{{ _.core_url }}/collection/collections"
+            name: GET /collections (listar)
+            meta:
+              id: req_7e759c0e5f9147c7b008283f333369f5
+              created: 1779210655372
+              modified: 1779210655372
+              isPrivate: false
+              description: Lista todas as coletas registradas no Core (incluindo as recebidas
+                via fila `coletas` do MS).
+              sortKey: -100
+            method: GET
+            headers:
+              - name: Authorization
+                value: Bearer {% response 'body', 'req_0a755d9b192b463b9d77c23e484b9039',
+                  'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}
+            settings:
+              renderRequestBody: true
+              encodeUrl: true
+              followRedirects: global
+              cookies:
+                send: true
+                store: true
+              rebuildPath: true
+          - url: "{{ _.core_url }}/collection/collections/1/evidences"
+            name: POST /collections/:id/evidences
+            meta:
+              id: req_270ed6eae91940e6b768ed001a2babea
+              created: 1779210655373
+              modified: 1779210655373
+              isPrivate: false
+              description: ""
+              sortKey: -60
+            method: POST
+            body:
+              mimeType: application/json
+              text: |-
+                {
+                  "foto_url": "https://exemplo.com/evidencia.jpg",
+                  "observacao": "Foto da apresentação"
+                }
+            headers:
+              - name: Authorization
+                value: Bearer {% response 'body', 'req_0a755d9b192b463b9d77c23e484b9039',
+                  'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}
+              - name: Content-Type
+                value: application/json
+            settings:
+              renderRequestBody: true
+              encodeUrl: true
+              followRedirects: global
+              cookies:
+                send: true
+                store: true
+              rebuildPath: true
+          - url: "{{ _.core_url }}/collection/collections/1/evidences"
+            name: GET /collections/:id/evidences
+            meta:
+              id: req_969c06907e24493888a8b6694317618d
+              created: 1779210655373
+              modified: 1779210655373
+              isPrivate: false
+              description: ""
+              sortKey: -70
+            method: GET
+            headers:
+              - name: Authorization
+                value: Bearer {% response 'body', 'req_0a755d9b192b463b9d77c23e484b9039',
+                  'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}
+            settings:
+              renderRequestBody: true
+              encodeUrl: true
+              followRedirects: global
+              cookies:
+                send: true
+                store: true
+              rebuildPath: true
+          - url: "{{ _.core_url }}/collection/collections/1"
+            name: GET /collections/:id
+            meta:
+              id: req_bf4affbbf6f04123826264522aa1b344
+              created: 1779210655373
+              modified: 1779210655373
+              isPrivate: false
+              description: ""
+              sortKey: -80
+            method: GET
+            headers:
+              - name: Authorization
+                value: Bearer {% response 'body', 'req_0a755d9b192b463b9d77c23e484b9039',
+                  'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}
+            settings:
+              renderRequestBody: true
+              encodeUrl: true
+              followRedirects: global
+              cookies:
+                send: true
+                store: true
+              rebuildPath: true
+      - name: 1. Autenticação
+        meta:
+          id: fld_88938496683348b1b2e6f1a46571481f
+          created: 1779210655360
+          modified: 1779210655360
+          sortKey: -100
+          description: Login JWT do Core. O endpoint correto é /api/token/ (e NÃO
+            /api/accounts/token/).
+        children:
+          - url: "{{ _.core_url }}/token/"
+            name: Login (obter access token)
+            meta:
+              id: req_0a755d9b192b463b9d77c23e484b9039
+              created: 1779210655362
+              modified: 1779212576379
+              isPrivate: false
+              description: POST /api/token/ usando email+password. O `access` retornado é
+                injetado automaticamente em todos os outros requests do Core via
+                Response Tag.
+              sortKey: -1000
+            method: POST
+            body:
+              mimeType: application/json
+              text: |-
+                {
+                  "email": "{{ _.core_email }}",
+                  "password": "{{ _.core_password }}"
+                }
+            headers:
+              - name: Content-Type
+                value: application/json
+            settings:
+              renderRequestBody: true
+              encodeUrl: true
+              followRedirects: global
+              cookies:
+                send: true
+                store: true
+              rebuildPath: true
+          - url: "{{ _.core_url }}/token/refresh/"
+            name: Refresh Token
+            meta:
+              id: req_9129b25c528b43f7b323db2119c84b02
+              created: 1779210655364
+              modified: 1779210655364
+              isPrivate: false
+              description: ""
+              sortKey: -990
+            method: POST
+            body:
+              mimeType: application/json
+              text: |-
+                {
+                  "refresh": "COLE_O_REFRESH_TOKEN_AQUI"
+                }
+            headers:
+              - name: Content-Type
+                value: application/json
+            settings:
+              renderRequestBody: true
+              encodeUrl: true
+              followRedirects: global
+              cookies:
+                send: true
+                store: true
+              rebuildPath: true
+          - url: "{{ _.core_url }}/accounts/auth/me"
+            name: GET /auth/me (perfil)
+            meta:
+              id: req_cd3738b8e33145c7bd18684d11d6db86
+              created: 1779210655365
+              modified: 1779210655365
+              isPrivate: false
+              description: ""
+              sortKey: -980
+            method: GET
+            headers:
+              - name: Authorization
+                value: Bearer {% response 'body', 'req_0a755d9b192b463b9d77c23e484b9039',
+                  'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}
+            settings:
+              renderRequestBody: true
+              encodeUrl: true
+              followRedirects: global
+              cookies:
+                send: true
+                store: true
+              rebuildPath: true
+          - url: "{{ _.core_url }}/accounts/auth"
+            name: POST /auth (criar usuário — gestor/supervisor)
+            meta:
+              id: req_005d704266374de284ba86d295927fec
+              created: 1779210655366
+              modified: 1779210655366
+              isPrivate: false
+              description: Requer perfil gestor/supervisor. Ajuste o payload conforme o
+                UsuarioCreateSerializer do projeto.
+              sortKey: -960
+            method: POST
+            body:
+              mimeType: application/json
+              text: |-
+                {
+                  "nome": "Morador Apresentação",
+                  "email": "morador@test.com",
+                  "password": "Senha@123",
+                  "perfil": "morador"
+                }
+            headers:
+              - name: Authorization
+                value: Bearer {% response 'body', 'req_0a755d9b192b463b9d77c23e484b9039',
+                  'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}
+              - name: Content-Type
+                value: application/json
+            settings:
+              renderRequestBody: true
+              encodeUrl: true
+              followRedirects: global
+              cookies:
+                send: true
+                store: true
+              rebuildPath: true
+          - url: "{{ _.core_url }}/accounts/auth/logout"
+            name: POST /auth/logout
+            meta:
+              id: req_91d21e9990a04213bc2f56e6f83e89c6
+              created: 1779210655366
+              modified: 1779210655366
+              isPrivate: false
+              description: ""
+              sortKey: -970
+            method: POST
+            body:
+              mimeType: application/json
+              text: |-
+                {
+                  "refresh": "COLE_O_REFRESH_TOKEN_AQUI"
+                }
+            headers:
+              - name: Authorization
+                value: Bearer {% response 'body', 'req_0a755d9b192b463b9d77c23e484b9039',
+                  'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}
+              - name: Content-Type
+                value: application/json
+            settings:
+              renderRequestBody: true
+              encodeUrl: true
+              followRedirects: global
+              cookies:
+                send: true
+                store: true
+              rebuildPath: true
+      - name: 2. Usuários & Papéis
+        meta:
+          id: fld_89cad96b607841889a94380d4420e58a
+          created: 1779210655360
+          modified: 1779210655360
+          sortKey: -90
+          description: Cadastro de gestores/supervisores/moradores e atribuição de roles.
+        children:
+          - url: "{{ _.core_url }}/accounts/users"
+            name: GET /users (listar)
+            meta:
+              id: req_172f1412dc504aef9917a9d2924e4018
+              created: 1779210655367
+              modified: 1779210655367
+              isPrivate: false
+              description: ""
+              sortKey: -100
+            method: GET
+            headers:
+              - name: Authorization
+                value: Bearer {% response 'body', 'req_0a755d9b192b463b9d77c23e484b9039',
+                  'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}
+            settings:
+              renderRequestBody: true
+              encodeUrl: true
+              followRedirects: global
+              cookies:
+                send: true
+                store: true
+              rebuildPath: true
+          - url: "{{ _.core_url }}/accounts/roles"
+            name: GET /roles (listar)
+            meta:
+              id: req_25a2ecd09d924690b0e73516ad82189e
+              created: 1779210655367
+              modified: 1779210655367
+              isPrivate: false
+              description: ""
+              sortKey: -80
+            method: GET
+            headers:
+              - name: Authorization
+                value: Bearer {% response 'body', 'req_0a755d9b192b463b9d77c23e484b9039',
+                  'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}
+            settings:
+              renderRequestBody: true
+              encodeUrl: true
+              followRedirects: global
+              cookies:
+                send: true
+                store: true
+              rebuildPath: true
+          - url: "{{ _.core_url }}/accounts/users/1"
+            name: GET /users/:id
+            meta:
+              id: req_26c0a09bf9dd47dda9b82b9ffacad6fe
+              created: 1779210655367
+              modified: 1779210655367
+              isPrivate: false
+              description: Substitua `1` pelo id real do usuário.
+              sortKey: -90
+            method: GET
+            headers:
+              - name: Authorization
+                value: Bearer {% response 'body', 'req_0a755d9b192b463b9d77c23e484b9039',
+                  'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}
+            settings:
+              renderRequestBody: true
+              encodeUrl: true
+              followRedirects: global
+              cookies:
+                send: true
+                store: true
+              rebuildPath: true
+          - url: "{{ _.core_url }}/accounts/users/1/roles/1"
+            name: POST /users/:id/roles/:roleId
+            meta:
+              id: req_56ed0ac958694c8d9be1c3cc8dc7c3a9
+              created: 1779210655368
+              modified: 1779210655368
+              isPrivate: false
+              description: ""
+              sortKey: -60
+            method: POST
+            headers:
+              - name: Authorization
+                value: Bearer {% response 'body', 'req_0a755d9b192b463b9d77c23e484b9039',
+                  'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}
+            settings:
+              renderRequestBody: true
+              encodeUrl: true
+              followRedirects: global
+              cookies:
+                send: true
+                store: true
+              rebuildPath: true
+          - url: "{{ _.core_url }}/accounts/roles"
+            name: POST /roles (criar)
+            meta:
+              id: req_fa9657b4191c4144894d8d02ae0b1b90
+              created: 1779210655368
+              modified: 1779210655368
+              isPrivate: false
+              description: ""
+              sortKey: -70
+            method: POST
+            body:
+              mimeType: application/json
+              text: |-
+                {
+                  "nome": "supervisor_apresentacao",
+                  "descricao": "Papel demo para apresentação",
+                  "ativo": true
+                }
+            headers:
+              - name: Authorization
+                value: Bearer {% response 'body', 'req_0a755d9b192b463b9d77c23e484b9039',
+                  'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}
+              - name: Content-Type
+                value: application/json
+            settings:
+              renderRequestBody: true
+              encodeUrl: true
+              followRedirects: global
+              cookies:
+                send: true
+                store: true
+              rebuildPath: true
+      - name: 3. Imóveis (Properties)
+        meta:
+          id: fld_89d250fb4682418ebbf10a26a517b3c6
+          created: 1779210655360
+          modified: 1779210655360
+          sortKey: -80
+          description: Cadastro de imóveis. Ao criar via POST, o Core publica o evento na
+            fila `imoveis` (RabbitMQ) — o MS consome e persiste no MongoDB.
+        children:
+          - url: "{{ _.core_url }}/program/properties"
+            name: GET /properties (listar)
+            meta:
+              id: req_9720802ec85646ec85bc77dfcfb8664a
+              created: 1779210655368
+              modified: 1779210655368
+              isPrivate: false
+              description: ""
+              sortKey: -100
+            method: GET
+            headers:
+              - name: Authorization
+                value: Bearer {% response 'body', 'req_0a755d9b192b463b9d77c23e484b9039',
+                  'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}
+            settings:
+              renderRequestBody: true
+              encodeUrl: true
+              followRedirects: global
+              cookies:
+                send: true
+                store: true
+              rebuildPath: true
+          - url: "{{ _.core_url }}/program/properties/1"
+            name: PATCH /properties/:id
+            meta:
+              id: req_5bdf8222263547bfa9195d2b522190aa
+              created: 1779210655369
+              modified: 1779210655369
+              isPrivate: false
+              description: ""
+              sortKey: -70
+            method: PATCH
+            body:
+              mimeType: application/json
+              text: |-
+                {
+                  "elegivel": true
+                }
+            headers:
+              - name: Authorization
+                value: Bearer {% response 'body', 'req_0a755d9b192b463b9d77c23e484b9039',
+                  'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}
+              - name: Content-Type
+                value: application/json
+            settings:
+              renderRequestBody: true
+              encodeUrl: true
+              followRedirects: global
+              cookies:
+                send: true
+                store: true
+              rebuildPath: true
+          - url: "{{ _.core_url }}/program/properties"
+            name: POST /properties (criar — publica na fila `imoveis`)
+            meta:
+              id: req_79372980967f47f295e1fe231f349f9b
+              created: 1779210655369
+              modified: 1779210655369
+              isPrivate: false
+              description: Passo 2.1 da apresentação. Ao salvar, o Core publica o evento na
+                fila `imoveis`, e o MS persiste no MongoDB.
+              sortKey: -90
+            method: POST
+            body:
+              mimeType: application/json
+              text: |-
+                {
+                  "iptu": "999888777",
+                  "logradouro": "Rua da Apresentação",
+                  "numero": "123",
+                  "bairro": "Centro",
+                  "elegivel": true
+                }
+            headers:
+              - name: Authorization
+                value: Bearer {% response 'body', 'req_0a755d9b192b463b9d77c23e484b9039',
+                  'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}
+              - name: Content-Type
+                value: application/json
+            settings:
+              renderRequestBody: true
+              encodeUrl: true
+              followRedirects: global
+              cookies:
+                send: true
+                store: true
+              rebuildPath: true
+          - url: "{{ _.core_url }}/program/properties/1"
+            name: GET /properties/:id
+            meta:
+              id: req_cfc36d2ed3ec4eb1b7d7a873cdfcc3ba
+              created: 1779210655369
+              modified: 1779210655369
+              isPrivate: false
+              description: ""
+              sortKey: -80
+            method: GET
+            headers:
+              - name: Authorization
+                value: Bearer {% response 'body', 'req_0a755d9b192b463b9d77c23e484b9039',
+                  'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}
+            settings:
+              renderRequestBody: true
+              encodeUrl: true
+              followRedirects: global
+              cookies:
+                send: true
+                store: true
+              rebuildPath: true
+          - url: "{{ _.core_url }}/program/properties/1/users"
+            name: POST /properties/:id/users (vincular morador)
+            meta:
+              id: req_1c592798280245cdbd8f59db25bfd962
+              created: 1779210655370
+              modified: 1779210655370
+              isPrivate: false
+              description: ""
+              sortKey: -60
+            method: POST
+            body:
+              mimeType: application/json
+              text: |-
+                {
+                  "user_id": 2
+                }
+            headers:
+              - name: Authorization
+                value: Bearer {% response 'body', 'req_0a755d9b192b463b9d77c23e484b9039',
+                  'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}
+              - name: Content-Type
+                value: application/json
+            settings:
+              renderRequestBody: true
+              encodeUrl: true
+              followRedirects: global
+              cookies:
+                send: true
+                store: true
+              rebuildPath: true
+          - url: "{{ _.core_url }}/program/properties/1/users/2"
+            name: DELETE /properties/:id/users/:userId
+            meta:
+              id: req_bb706ef3cd69492a87ea8d31a4127da7
+              created: 1779210655370
+              modified: 1779210655370
+              isPrivate: false
+              description: ""
+              sortKey: -50
+            method: DELETE
+            headers:
+              - name: Authorization
+                value: Bearer {% response 'body', 'req_0a755d9b192b463b9d77c23e484b9039',
+                  'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}
+            settings:
+              renderRequestBody: true
+              encodeUrl: true
+              followRedirects: global
+              cookies:
+                send: true
+                store: true
+              rebuildPath: true
+      - name: 4. Programas & Regras
+        meta:
+          id: fld_df5ca85ab14d41889c300fa5f013ba1c
+          created: 1779210655360
+          modified: 1779210655360
+          sortKey: -70
+          description: CRUD de programas e suas regras (pontos por real, mínimo, teto).
+        children:
+          - url: "{{ _.core_url }}/program/programs"
+            name: GET /programs (listar)
+            meta:
+              id: req_010295e0637a469d9f8bebd3b4df29ed
+              created: 1779210655370
+              modified: 1779210655370
+              isPrivate: false
+              description: ""
+              sortKey: -100
+            method: GET
+            headers:
+              - name: Authorization
+                value: Bearer {% response 'body', 'req_0a755d9b192b463b9d77c23e484b9039',
+                  'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}
+            settings:
+              renderRequestBody: true
+              encodeUrl: true
+              followRedirects: global
+              cookies:
+                send: true
+                store: true
+              rebuildPath: true
+          - url: "{{ _.core_url }}/program/programs/1"
+            name: GET /programs/:id
+            meta:
+              id: req_0a3631674c03454ba9c9cf881f572d88
+              created: 1779210655371
+              modified: 1779210655371
+              isPrivate: false
+              description: ""
+              sortKey: -80
+            method: GET
+            headers:
+              - name: Authorization
+                value: Bearer {% response 'body', 'req_0a755d9b192b463b9d77c23e484b9039',
+                  'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}
+            settings:
+              renderRequestBody: true
+              encodeUrl: true
+              followRedirects: global
+              cookies:
+                send: true
+                store: true
+              rebuildPath: true
+          - url: "{{ _.core_url }}/program/programs/1/rules"
+            name: GET /programs/:id/rules
+            meta:
+              id: req_1bbad36cc5fb4c30851c59f30fb58315
+              created: 1779210655371
+              modified: 1779210655371
+              isPrivate: false
+              description: ""
+              sortKey: -70
+            method: GET
+            headers:
+              - name: Authorization
+                value: Bearer {% response 'body', 'req_0a755d9b192b463b9d77c23e484b9039',
+                  'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}
+            settings:
+              renderRequestBody: true
+              encodeUrl: true
+              followRedirects: global
+              cookies:
+                send: true
+                store: true
+              rebuildPath: true
+          - url: "{{ _.core_url }}/program/programs"
+            name: POST /programs (criar)
+            meta:
+              id: req_752548bcc5f34f6785f7afd3721a1250
+              created: 1779210655371
+              modified: 1779210655371
+              isPrivate: false
+              description: ""
+              sortKey: -90
+            method: POST
+            body:
+              mimeType: application/json
+              text: |-
+                {
+                  "nome": "Programa Apresentação",
+                  "data_inicio": "2026-05-01",
+                  "data_fim": "2026-12-31",
+                  "desconto_maximo": "40.00",
+                  "ativo": true
+                }
+            headers:
+              - name: Authorization
+                value: Bearer {% response 'body', 'req_0a755d9b192b463b9d77c23e484b9039',
+                  'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}
+              - name: Content-Type
+                value: application/json
+            settings:
+              renderRequestBody: true
+              encodeUrl: true
+              followRedirects: global
+              cookies:
+                send: true
+                store: true
+              rebuildPath: true
+          - url: "{{ _.core_url }}/program/programs/1/rules"
+            name: PATCH /programs/:id/rules
+            meta:
+              id: req_9e28b2a3fbaf4c088cea0e4e67a9b7b2
+              created: 1779210655372
+              modified: 1779210655372
+              isPrivate: false
+              description: ""
+              sortKey: -60
+            method: PATCH
+            body:
+              mimeType: application/json
+              text: |-
+                {
+                  "pontos_por_real": "10.00",
+                  "minimo_para_beneficio": "50.00"
+                }
+            headers:
+              - name: Authorization
+                value: Bearer {% response 'body', 'req_0a755d9b192b463b9d77c23e484b9039',
+                  'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}
+              - name: Content-Type
+                value: application/json
+            settings:
+              renderRequestBody: true
+              encodeUrl: true
+              followRedirects: global
+              cookies:
+                send: true
+                store: true
+              rebuildPath: true
+      - name: 8. Portal do Cidadão (/me)
+        meta:
+          id: fld_23ec79f8cb7c4a748f8b6100f3c7d8d5
+          created: 1779210655361
+          modified: 1779210655361
+          sortKey: -30
+          description: "Visão do morador: histórico, pontos, benefícios e programa em que
+            participa."
+        children:
+          - url: "{{ _.core_url }}/accounts/me/history"
+            name: GET /me/history
+            meta:
+              id: req_4c4d01280ab04665b54d2c2aba912907
+              created: 1779210655377
+              modified: 1779210655377
+              isPrivate: false
+              description: ""
+              sortKey: -100
+            method: GET
+            headers:
+              - name: Authorization
+                value: Bearer {% response 'body', 'req_0a755d9b192b463b9d77c23e484b9039',
+                  'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}
+            settings:
+              renderRequestBody: true
+              encodeUrl: true
+              followRedirects: global
+              cookies:
+                send: true
+                store: true
+              rebuildPath: true
+          - url: "{{ _.core_url }}/accounts/me/points"
+            name: GET /me/points
+            meta:
+              id: req_b32c356623db4e2a997ca361cac6a528
+              created: 1779210655377
+              modified: 1779210655377
+              isPrivate: false
+              description: ""
+              sortKey: -90
+            method: GET
+            headers:
+              - name: Authorization
+                value: Bearer {% response 'body', 'req_0a755d9b192b463b9d77c23e484b9039',
+                  'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}
+            settings:
+              renderRequestBody: true
+              encodeUrl: true
+              followRedirects: global
+              cookies:
+                send: true
+                store: true
+              rebuildPath: true
+          - url: "{{ _.core_url }}/accounts/me/benefits"
+            name: GET /me/benefits
+            meta:
+              id: req_078c195c359242a794238eab4f9d8ff2
+              created: 1779210655378
+              modified: 1779210655378
+              isPrivate: false
+              description: ""
+              sortKey: -80
+            method: GET
+            headers:
+              - name: Authorization
+                value: Bearer {% response 'body', 'req_0a755d9b192b463b9d77c23e484b9039',
+                  'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}
+            settings:
+              renderRequestBody: true
+              encodeUrl: true
+              followRedirects: global
+              cookies:
+                send: true
+                store: true
+              rebuildPath: true
+          - url: "{{ _.core_url }}/accounts/me/program"
+            name: GET /me/program
+            meta:
+              id: req_691f33eedf864300b8562d9af5816720
+              created: 1779210655378
+              modified: 1779210655378
+              isPrivate: false
+              description: ""
+              sortKey: -70
+            method: GET
+            headers:
+              - name: Authorization
+                value: Bearer {% response 'body', 'req_0a755d9b192b463b9d77c23e484b9039',
+                  'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}
+            settings:
+              renderRequestBody: true
+              encodeUrl: true
+              followRedirects: global
+              cookies:
+                send: true
+                store: true
+              rebuildPath: true
+      - name: 6. Consolidações & Benefícios
+        meta:
+          id: fld_7b64d82d3181454d8399197e49fb4893
+          created: 1779210655361
+          modified: 1779210655361
+          sortKey: -50
+          description: Execução de consolidações de ciclo e consulta de saldos/descontos
+            por imóvel.
+        children:
+          - url: "{{ _.core_url }}/program/consolidations/run"
+            name: POST /consolidations/run
+            meta:
+              id: req_07fc11afb21942f3914b3c73bc8973d5
+              created: 1779210655374
+              modified: 1779210655374
+              isPrivate: false
+              description: "Dispara a consolidação do ciclo: soma pontuação por imóvel,
+                converte em desconto e aplica teto."
+              sortKey: -100
+            method: POST
+            body:
+              mimeType: application/json
+              text: |-
+                {
+                  "programa_id": 1,
+                  "ciclo": "05-2026"
+                }
+            headers:
+              - name: Authorization
+                value: Bearer {% response 'body', 'req_0a755d9b192b463b9d77c23e484b9039',
+                  'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}
+              - name: Content-Type
+                value: application/json
+            settings:
+              renderRequestBody: true
+              encodeUrl: true
+              followRedirects: global
+              cookies:
+                send: true
+                store: true
+              rebuildPath: true
+          - url: "{{ _.core_url }}/program/consolidations"
+            name: GET /consolidations (listar)
+            meta:
+              id: req_22141d89fb9f4236b2a575083a877e98
+              created: 1779210655374
+              modified: 1779210655374
+              isPrivate: false
+              description: ""
+              sortKey: -90
+            method: GET
+            headers:
+              - name: Authorization
+                value: Bearer {% response 'body', 'req_0a755d9b192b463b9d77c23e484b9039',
+                  'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}
+            settings:
+              renderRequestBody: true
+              encodeUrl: true
+              followRedirects: global
+              cookies:
+                send: true
+                store: true
+              rebuildPath: true
+          - url: "{{ _.core_url }}/program/consolidations/1"
+            name: GET /consolidations/:id
+            meta:
+              id: req_294e42b7e8b648cdbc67fd99eb1ffa34
+              created: 1779210655374
+              modified: 1779210655374
+              isPrivate: false
+              description: ""
+              sortKey: -80
+            method: GET
+            headers:
+              - name: Authorization
+                value: Bearer {% response 'body', 'req_0a755d9b192b463b9d77c23e484b9039',
+                  'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}
+            settings:
+              renderRequestBody: true
+              encodeUrl: true
+              followRedirects: global
+              cookies:
+                send: true
+                store: true
+              rebuildPath: true
+          - url: "{{ _.core_url }}/program/benefits"
+            name: GET /benefits (listar saldos)
+            meta:
+              id: req_3638915844554a868be41607dcc9e2b8
+              created: 1779210655375
+              modified: 1779210655375
+              isPrivate: false
+              description: ""
+              sortKey: -70
+            method: GET
+            headers:
+              - name: Authorization
+                value: Bearer {% response 'body', 'req_0a755d9b192b463b9d77c23e484b9039',
+                  'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}
+            settings:
+              renderRequestBody: true
+              encodeUrl: true
+              followRedirects: global
+              cookies:
+                send: true
+                store: true
+              rebuildPath: true
+          - url: "{{ _.core_url }}/program/benefits/1"
+            name: GET /benefits/:propertyId (saldo do imóvel)
+            meta:
+              id: req_567edb4326654e4699300ba8c2d38896
+              created: 1779210655375
+              modified: 1779210655375
+              isPrivate: false
+              description: Passo 4.2 da apresentação. Substitua `1` pelo id do imóvel
+                cadastrado.
+              sortKey: -60
+            method: GET
+            headers:
+              - name: Authorization
+                value: Bearer {% response 'body', 'req_0a755d9b192b463b9d77c23e484b9039',
+                  'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}
+            settings:
+              renderRequestBody: true
+              encodeUrl: true
+              followRedirects: global
+              cookies:
+                send: true
+                store: true
+              rebuildPath: true
+      - name: 9. Contestações (Disputes)
+        meta:
+          id: fld_a371002a3ec24501a40c877314e28512
+          created: 1779210655361
+          modified: 1779210655361
+          sortKey: -20
+          description: Morador contesta uma coleta; gestor analisa.
+        children:
+          - url: "{{ _.core_url }}/collection/disputes"
+            name: GET /disputes (listar)
+            meta:
+              id: req_459443c84b2d4ea59b420dc8f294cd85
+              created: 1779210655378
+              modified: 1779210655378
+              isPrivate: false
+              description: ""
+              sortKey: -100
+            method: GET
+            headers:
+              - name: Authorization
+                value: Bearer {% response 'body', 'req_0a755d9b192b463b9d77c23e484b9039',
+                  'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}
+            settings:
+              renderRequestBody: true
+              encodeUrl: true
+              followRedirects: global
+              cookies:
+                send: true
+                store: true
+              rebuildPath: true
+          - url: "{{ _.core_url }}/collection/disputes"
+            name: POST /disputes (morador abre)
+            meta:
+              id: req_86b22fdc4304406d9c815cd6b9ed8d78
+              created: 1779210655379
+              modified: 1779210655379
+              isPrivate: false
+              description: ""
+              sortKey: -90
+            method: POST
+            body:
+              mimeType: application/json
+              text: |-
+                {
+                  "coleta": 1,
+                  "motivo": "Pesagem incorreta"
+                }
+            headers:
+              - name: Authorization
+                value: Bearer {% response 'body', 'req_0a755d9b192b463b9d77c23e484b9039',
+                  'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}
+              - name: Content-Type
+                value: application/json
+            settings:
+              renderRequestBody: true
+              encodeUrl: true
+              followRedirects: global
+              cookies:
+                send: true
+                store: true
+              rebuildPath: true
+          - url: "{{ _.core_url }}/collection/disputes/1"
+            name: GET /disputes/:id
+            meta:
+              id: req_a5461663ba2c453c88fd5e5ae532e7dc
+              created: 1779210655383
+              modified: 1779210655383
+              isPrivate: false
+              description: ""
+              sortKey: -80
+            method: GET
+            headers:
+              - name: Authorization
+                value: Bearer {% response 'body', 'req_0a755d9b192b463b9d77c23e484b9039',
+                  'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}
+            settings:
+              renderRequestBody: true
+              encodeUrl: true
+              followRedirects: global
+              cookies:
+                send: true
+                store: true
+              rebuildPath: true
+          - url: "{{ _.core_url }}/collection/disputes/1"
+            name: PATCH /disputes/:id (gestor analisa)
+            meta:
+              id: req_05b589b83d68417b880574433a9beb07
+              created: 1779210655384
+              modified: 1779210655384
+              isPrivate: false
+              description: ""
+              sortKey: -70
+            method: PATCH
+            body:
+              mimeType: application/json
+              text: |-
+                {
+                  "status": "aceita",
+                  "resposta": "Pesagem corrigida"
+                }
+            headers:
+              - name: Authorization
+                value: Bearer {% response 'body', 'req_0a755d9b192b463b9d77c23e484b9039',
+                  'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}
+              - name: Content-Type
+                value: application/json
+            settings:
+              renderRequestBody: true
+              encodeUrl: true
+              followRedirects: global
+              cookies:
+                send: true
+                store: true
+              rebuildPath: true
+      - name: 7. Relatórios
+        meta:
+          id: fld_debf19a89b9640e08b10d1b0d9f496de
+          created: 1779210655361
+          modified: 1779210655361
+          sortKey: -40
+          description: "Relatórios agregados: participação, ranking, impacto."
+        children:
+          - url: "{{ _.core_url }}/program/reports/impact"
+            name: GET /reports/impact
+            meta:
+              id: req_071b24cc32854c3482037ba08d518475
+              created: 1779210655376
+              modified: 1779210655376
+              isPrivate: false
+              description: ""
+              sortKey: -80
+            method: GET
+            headers:
+              - name: Authorization
+                value: Bearer {% response 'body', 'req_0a755d9b192b463b9d77c23e484b9039',
+                  'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}
+            settings:
+              renderRequestBody: true
+              encodeUrl: true
+              followRedirects: global
+              cookies:
+                send: true
+                store: true
+              rebuildPath: true
+          - url: "{{ _.core_url }}/program/reports/participation"
+            name: GET /reports/participation
+            meta:
+              id: req_3b68ae29865944ae926a0369390e83e4
+              created: 1779210655376
+              modified: 1779210655376
+              isPrivate: false
+              description: ""
+              sortKey: -100
+            method: GET
+            headers:
+              - name: Authorization
+                value: Bearer {% response 'body', 'req_0a755d9b192b463b9d77c23e484b9039',
+                  'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}
+            settings:
+              renderRequestBody: true
+              encodeUrl: true
+              followRedirects: global
+              cookies:
+                send: true
+                store: true
+              rebuildPath: true
+          - url: "{{ _.core_url }}/program/reports/ranking"
+            name: GET /reports/ranking
+            meta:
+              id: req_cc47dd9658e348348cdae9e90cf4d63f
+              created: 1779210655376
+              modified: 1779210655376
+              isPrivate: false
+              description: ""
+              sortKey: -90
+            method: GET
+            headers:
+              - name: Authorization
+                value: Bearer {% response 'body', 'req_0a755d9b192b463b9d77c23e484b9039',
+                  'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}
+            settings:
+              renderRequestBody: true
+              encodeUrl: true
+              followRedirects: global
+              cookies:
+                send: true
+                store: true
+              rebuildPath: true
+  - name: 🟩 Microsserviço — :8002
+    meta:
+      id: fld_497d98706fe8423d92e5cf3b8d0ac3f8
+      created: 1779210655361
+      modified: 1779210655361
+      sortKey: -400
+      description: Microsserviço de Coletas (cp-collection-ms). MongoDB + Django REST.
+        Auth via JWT customizado retornando { token, user }.
+    children:
+      - name: 1. Autenticação
+        meta:
+          id: fld_ea659c1b6d40441788b38f3c8f2689d4
+          created: 1779210655361
+          modified: 1779210655361
+          sortKey: -100
+          description: Registro/login do Coletor. Login usa matrícula + senha e devolve
+            {token, user}.
+        children:
+          - url: "{{ _.ms_url }}/auth/logout"
+            name: POST /auth/logout
+            meta:
+              id: req_35c6458bf7d04ce1a48b64f43c338399
+              created: 1779210655384
+              modified: 1779210655384
+              isPrivate: false
+              description: ""
+              sortKey: -990
+            method: POST
+            body:
+              mimeType: application/json
+              text: "{}"
+            headers:
+              - name: Authorization
+                value: Bearer {% response 'body', 'req_8d07ed92943048b18e88d33c57561d9a',
+                  'b64::JC50b2tlbg==::46b', 'no-history', 60, 'never' %}
+              - name: Content-Type
+                value: application/json
+            settings:
+              renderRequestBody: true
+              encodeUrl: true
+              followRedirects: global
+              cookies:
+                send: true
+                store: true
+              rebuildPath: true
+          - url: "{{ _.ms_url }}/auth/login"
+            name: 🔑 Login (obter access token)
+            meta:
+              id: req_8d07ed92943048b18e88d33c57561d9a
+              created: 1779210655384
+              modified: 1779210655384
+              isPrivate: false
+              description: POST /api/auth/login no MS usando matrícula + senha. O `token`
+                retornado é injetado automaticamente em todos os outros requests
+                do MS via Response Tag.
+              sortKey: -1000
+            method: POST
+            body:
+              mimeType: application/json
+              text: |-
+                {
+                  "matricula": "{{ _.ms_matricula }}",
+                  "senha": "{{ _.ms_senha }}"
+                }
+            headers:
+              - name: Content-Type
+                value: application/json
+            settings:
+              renderRequestBody: true
+              encodeUrl: true
+              followRedirects: global
+              cookies:
+                send: true
+                store: true
+              rebuildPath: true
+          - url: "{{ _.ms_url }}/auth/register"
+            name: POST /auth/register
+            meta:
+              id: req_f18f760ed2c04e76a3969038839f1a33
+              created: 1779210655384
+              modified: 1779210655384
+              isPrivate: false
+              description: ""
+              sortKey: -1010
+            method: POST
+            body:
+              mimeType: application/json
+              text: |-
+                {
+                  "matricula": "{{ _.ms_matricula }}",
+                  "senha": "{{ _.ms_senha }}",
+                  "nome": "João Silva",
+                  "email": "joao@prefeitura.gov.br",
+                  "zona": "Norte",
+                  "cargo": "Agente de coleta"
+                }
+            headers:
+              - name: Content-Type
+                value: application/json
+            settings:
+              renderRequestBody: true
+              encodeUrl: true
+              followRedirects: global
+              cookies:
+                send: true
+                store: true
+              rebuildPath: true
+      - name: 2. Perfil
+        meta:
+          id: fld_ed6a21f7fb8f47edaf3c1161b7352ddf
+          created: 1779210655361
+          modified: 1779210655361
+          sortKey: -90
+          description: Dados do coletor autenticado.
+        children:
+          - url: "{{ _.ms_url }}/me"
+            name: GET /me (perfil)
+            meta:
+              id: req_79fc689fabf04de897d789800ba1e1d9
+              created: 1779210655385
+              modified: 1779210655385
+              isPrivate: false
+              description: Retorna perfil do coletor autenticado.
+              sortKey: -100
+            method: GET
+            headers:
+              - name: Authorization
+                value: Bearer {% response 'body', 'req_8d07ed92943048b18e88d33c57561d9a',
+                  'b64::JC50b2tlbg==::46b', 'no-history', 60, 'never' %}
+            settings:
+              renderRequestBody: true
+              encodeUrl: true
+              followRedirects: global
+              cookies:
+                send: true
+                store: true
+              rebuildPath: true
+      - name: 4. Coletas
+        meta:
+          id: fld_14e1d89093eb4b669195eede83b5d9b9
+          created: 1779210655362
+          modified: 1779210655362
+          sortKey: -60
+          description: Criar coleta (publica na fila `coletas`), histórico, pendentes e
+            detalhe.
+        children:
+          - url: "{{ _.ms_url }}/coletas"
+            name: POST /coletas (criar — publica na fila `coletas`)
+            meta:
+              id: req_64d36ad6b6644aa8b352bd7a92e5deb5
+              created: 1779210655386
+              modified: 1779210655386
+              isPrivate: false
+              description: "Passo 3.1 da apresentação. `sincronizado: true` indica que a
+                coleta foi publicada com sucesso na fila do RabbitMQ."
+              sortKey: -100
+            method: POST
+            body:
+              mimeType: application/json
+              text: |-
+                {
+                  "imovel_id": "SUBSTITUA_OBJECTID_DO_IMOVEL",
+                  "data_hora": "2026-05-19T10:00:00Z",
+                  "peso_total_kg": "2.5",
+                  "gps": {
+                    "latitude": -6.1086,
+                    "longitude": -38.2089
+                  },
+                  "foto_url": null,
+                  "observacoes": "",
+                  "offline_id": null
+                }
+            headers:
+              - name: Authorization
+                value: Bearer {% response 'body', 'req_8d07ed92943048b18e88d33c57561d9a',
+                  'b64::JC50b2tlbg==::46b', 'no-history', 60, 'never' %}
+              - name: Content-Type
+                value: application/json
+            settings:
+              renderRequestBody: true
+              encodeUrl: true
+              followRedirects: global
+              cookies:
+                send: true
+                store: true
+              rebuildPath: true
+          - url: "{{ _.ms_url }}/coletas/historico?tipo_periodo=hoje&page=1&limit=30"
+            name: GET /coletas/historico
+            meta:
+              id: req_3cf726550d7d489697e249242dc59127
+              created: 1779210655387
+              modified: 1779210655387
+              isPrivate: false
+              description: "tipo_periodo: hoje | ontem | semana | mes. Pode usar
+                data=YYYY-MM-DD no lugar de tipo_periodo."
+              sortKey: -90
+            method: GET
+            parameters:
+              - name: tipo_periodo
+                value: hoje
+              - name: page
+                value: "1"
+              - name: limit
+                value: "30"
+            headers:
+              - name: Authorization
+                value: Bearer {% response 'body', 'req_8d07ed92943048b18e88d33c57561d9a',
+                  'b64::JC50b2tlbg==::46b', 'no-history', 60, 'never' %}
+            settings:
+              renderRequestBody: true
+              encodeUrl: true
+              followRedirects: global
+              cookies:
+                send: true
+                store: true
+              rebuildPath: true
+          - url: "{{ _.ms_url }}/coletas/pendentes"
+            name: GET /coletas/pendentes
+            meta:
+              id: req_7eafcf6e7f694f2c9c3ee68a1b0ee737
+              created: 1779210655387
+              modified: 1779210655387
+              isPrivate: false
+              description: ""
+              sortKey: -80
+            method: GET
+            headers:
+              - name: Authorization
+                value: Bearer {% response 'body', 'req_8d07ed92943048b18e88d33c57561d9a',
+                  'b64::JC50b2tlbg==::46b', 'no-history', 60, 'never' %}
+            settings:
+              renderRequestBody: true
+              encodeUrl: true
+              followRedirects: global
+              cookies:
+                send: true
+                store: true
+              rebuildPath: true
+          - url: "{{ _.ms_url }}/coletas/SUBSTITUA_OBJECTID_DA_COLETA"
+            name: GET /coletas/:coleta_id (detalhe)
+            meta:
+              id: req_d1afc3107c2d456fb6630daa83af1ed7
+              created: 1779210655387
+              modified: 1779210655387
+              isPrivate: false
+              description: ""
+              sortKey: -70
+            method: GET
+            headers:
+              - name: Authorization
+                value: Bearer {% response 'body', 'req_8d07ed92943048b18e88d33c57561d9a',
+                  'b64::JC50b2tlbg==::46b', 'no-history', 60, 'never' %}
+            settings:
+              renderRequestBody: true
+              encodeUrl: true
+              followRedirects: global
+              cookies:
+                send: true
+                store: true
+              rebuildPath: true
+      - name: 3. Imóveis
+        meta:
+          id: fld_1f2b427db2db46b19618f83b9de58ea3
+          created: 1779210655362
+          modified: 1779210655362
+          sortKey: -70
+          description: Busca por número IPTU, QR code (id_externo do Core) e endereço.
+            Detalhe do imóvel.
+        children:
+          - url: "{{ _.ms_url }}/imoveis/buscar?tipo=numero&valor=999888777"
+            name: GET /imoveis/buscar (por numero IPTU)
+            meta:
+              id: req_300574b4a9104dcfa7533024316f8887
+              created: 1779210655385
+              modified: 1779210655385
+              isPrivate: false
+              description: ""
+              sortKey: -100
+            method: GET
+            parameters:
+              - name: tipo
+                value: numero
+              - name: valor
+                value: "999888777"
+            headers:
+              - name: Authorization
+                value: Bearer {% response 'body', 'req_8d07ed92943048b18e88d33c57561d9a',
+                  'b64::JC50b2tlbg==::46b', 'no-history', 60, 'never' %}
+            settings:
+              renderRequestBody: true
+              encodeUrl: true
+              followRedirects: global
+              cookies:
+                send: true
+                store: true
+              rebuildPath: true
+          - url: "{{ _.ms_url }}/imoveis/SUBSTITUA_OBJECTID_DO_IMOVEL"
+            name: GET /imoveis/:imovel_id (detalhe)
+            meta:
+              id: req_449703ac83274e39afd2a55ecfaffcfc
+              created: 1779210655386
+              modified: 1779210655386
+              isPrivate: false
+              description: ""
+              sortKey: -70
+            method: GET
+            headers:
+              - name: Authorization
+                value: Bearer {% response 'body', 'req_8d07ed92943048b18e88d33c57561d9a',
+                  'b64::JC50b2tlbg==::46b', 'no-history', 60, 'never' %}
+            settings:
+              renderRequestBody: true
+              encodeUrl: true
+              followRedirects: global
+              cookies:
+                send: true
+                store: true
+              rebuildPath: true
+          - url: "{{ _.ms_url }}/imoveis/buscar?tipo=qrcode&valor=COLE_O_ID_GERADO_NO_CORE"
+            name: GET /imoveis/buscar (por QR code → id externo do Core)
+            meta:
+              id: req_5ed0cb5602164aad958c31067bcd5d20
+              created: 1779210655386
+              modified: 1779210655386
+              isPrivate: false
+              description: "Passo 2.2 da apresentação: aqui o `valor` deve ser o id do imóvel
+                retornado pelo Core (id_externo). O MS responde com o ObjectId
+                do Mongo, que é o `imovel_id` usado para criar coletas."
+              sortKey: -90
+            method: GET
+            parameters:
+              - name: tipo
+                value: qrcode
+              - name: valor
+                value: COLE_O_ID_GERADO_NO_CORE
+            headers:
+              - name: Authorization
+                value: Bearer {% response 'body', 'req_8d07ed92943048b18e88d33c57561d9a',
+                  'b64::JC50b2tlbg==::46b', 'no-history', 60, 'never' %}
+            settings:
+              renderRequestBody: true
+              encodeUrl: true
+              followRedirects: global
+              cookies:
+                send: true
+                store: true
+              rebuildPath: true
+          - url: "{{ _.ms_url
+              }}/imoveis/buscar?tipo=endereco&valor=Rua%20da%20Apresenta%C3%A7%\
+              C3%A3o"
+            name: GET /imoveis/buscar (por endereço)
+            meta:
+              id: req_8899ccde795245a09edaa7830b9d7fd9
+              created: 1779210655386
+              modified: 1779210655386
+              isPrivate: false
+              description: Busca imóveis cujo logradouro contenha o valor informado.
+              sortKey: -80
+            method: GET
+            parameters:
+              - name: tipo
+                value: endereco
+              - name: valor
+                value: Rua da Apresentação
+            headers:
+              - name: Authorization
+                value: Bearer {% response 'body', 'req_8d07ed92943048b18e88d33c57561d9a',
+                  'b64::JC50b2tlbg==::46b', 'no-history', 60, 'never' %}
+            settings:
+              renderRequestBody: true
+              encodeUrl: true
+              followRedirects: global
+              cookies:
+                send: true
+                store: true
+              rebuildPath: true
+      - name: 5. Sincronização
+        meta:
+          id: fld_6aca08fdb1f54fe2b88dd1a67a0cdd75
+          created: 1779210655362
+          modified: 1779210655362
+          sortKey: -50
+          description: Envio em lote de coletas offline e status de sincronização.
+        children:
+          - url: "{{ _.ms_url }}/sincronizar"
+            name: POST /sincronizar (batch offline)
+            meta:
+              id: req_52e5ecb69ca34cb2938fe076b384fbef
+              created: 1779210655387
+              modified: 1779210655387
+              isPrivate: false
+              description: 200 = tudo sincronizado, 207 = erros parciais.
+              sortKey: -100
+            method: POST
+            body:
+              mimeType: application/json
+              text: |-
+                {
+                  "coletas": [
+                    {
+                      "offline_id": "550e8400-e29b-41d4-a716-446655440000",
+                      "imovel_id": "SUBSTITUA_OBJECTID_DO_IMOVEL",
+                      "data_hora": "2026-05-19T07:15:00-03:00",
+                      "peso_total_kg": "4.8",
+                      "gps": { "latitude": -6.1086, "longitude": -38.2089 },
+                      "foto_url": null
+                    }
+                  ]
+                }
+            headers:
+              - name: Authorization
+                value: Bearer {% response 'body', 'req_8d07ed92943048b18e88d33c57561d9a',
+                  'b64::JC50b2tlbg==::46b', 'no-history', 60, 'never' %}
+              - name: Content-Type
+                value: application/json
+            settings:
+              renderRequestBody: true
+              encodeUrl: true
+              followRedirects: global
+              cookies:
+                send: true
+                store: true
+              rebuildPath: true
+          - url: "{{ _.ms_url }}/sincronizacao/status"
+            name: GET /sincronizacao/status
+            meta:
+              id: req_5a982b4eec2947a5806ed744798b5d5d
+              created: 1779210655387
+              modified: 1779210655387
+              isPrivate: false
+              description: Passo 4.1 da apresentação. Retorna pendentes, sincronizadas_hoje e
+                última sincronização.
+              sortKey: -90
+            method: GET
+            headers:
+              - name: Authorization
+                value: Bearer {% response 'body', 'req_8d07ed92943048b18e88d33c57561d9a',
+                  'b64::JC50b2tlbg==::46b', 'no-history', 60, 'never' %}
+            settings:
+              renderRequestBody: true
+              encodeUrl: true
+              followRedirects: global
+              cookies:
+                send: true
+                store: true
+              rebuildPath: true
+cookieJar:
+  name: Default Jar
+  meta:
+    id: jar_6be249180a505ac160c2db149707df700c6c7b53
+    created: 1779210655389
+    modified: 1779210655389
+environments:
+  name: Base
+  meta:
+    id: env_42d55f8add624dae85d0bb695b50d74c
+    created: 1779210655359
+    modified: 1779210803944
+    isPrivate: false
+  data:
+    core_url: http://localhost:8001/api
+    ms_url: http://localhost:8002/api
+    core_email: heitorqueiroga1@hotmail.com
+    core_password: Pass@2022
+    ms_matricula: MAT001
+    ms_senha: Senha@123

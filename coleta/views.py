@@ -9,7 +9,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import Coleta, Imovel, Rota, RotaImovel
+from .models import Coleta, Imovel
 from .serializers import (
     ColetaDetailSerializer,
     ColetaHistoricoItemSerializer,
@@ -17,7 +17,6 @@ from .serializers import (
     ColetaOutputSerializer,
     ImovelBuscarSerializer,
     ImovelDetailSerializer,
-    RotaImovelSerializer,
 )
 from .services.fila import publicar_coleta
 
@@ -33,82 +32,6 @@ def _gerar_codigo():
     numeros = ''.join(random.choices(string.digits, k=4))
     return f"{letras}-{numeros}"
 
-
-# ─── Rotas ────────────────────────────────────────────────────────────────────
-
-class RotaHojeView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request):
-        rota = Rota.objects.filter(coletor=request.user, data=_hoje()).first()
-        if not rota:
-            return Response({'error': 'Nenhuma rota para hoje'}, status=status.HTTP_404_NOT_FOUND)
-
-        coletas_hoje = Coleta.objects.filter(coletor=request.user, data_hora__date=_hoje())
-        total_kg = sum(c.peso_total_kg for c in coletas_hoje)
-        total_pontos = sum(c.pontos_gerados for c in coletas_hoje)
-
-        imoveis_coletados = rota.paradas.filter(status=RotaImovel.Status.COLETADO).count()
-        imoveis_recusados = rota.paradas.filter(status=RotaImovel.Status.RECUSADO).count()
-        imoveis_pendentes = rota.paradas.filter(status=RotaImovel.Status.PENDENTE).count()
-        imoveis_fora_fila = rota.total_imoveis - imoveis_coletados - imoveis_recusados - imoveis_pendentes
-
-        proximo_imovel = None
-        proxima_parada = rota.paradas.filter(status=RotaImovel.Status.PENDENTE).order_by('sequencia').first()
-        if proxima_parada:
-            imovel = proxima_parada.imovel
-            proximo_imovel = {
-                'id': str(imovel.id),
-                'numero_iptu': imovel.iptu,
-                'endereco': f"{imovel.logradouro}, {imovel.numero}",
-                'bairro': imovel.bairro,
-                'distancia_metros': proxima_parada.distancia_metros,
-            }
-
-        hora_encerro = None
-        if rota.hora_prevista_encerro:
-            hora_encerro = rota.hora_prevista_encerro.strftime('%H:%M')
-
-        return Response({
-            'id': str(rota.id),
-            'codigo': rota.codigo,
-            'zona': rota.zona,
-            'total_imoveis': rota.total_imoveis,
-            'imoveis_coletados': imoveis_coletados,
-            'imoveis_recusados': imoveis_recusados,
-            'imoveis_fora_fila': max(imoveis_fora_fila, 0),
-            'total_kg': float(total_kg),
-            'total_pontos': float(total_pontos),
-            'hora_prevista_encerro': hora_encerro,
-            'tempo_restante_minutos': None,
-            'proximo_imovel': proximo_imovel,
-        })
-
-
-class RotaParadasView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request, pk):
-        try:
-            rota = Rota.objects.get(pk=pk, coletor=request.user)
-        except Rota.DoesNotExist:
-            return Response({'error': 'Rota não encontrada'}, status=status.HTTP_404_NOT_FOUND)
-
-        page = int(request.query_params.get('page', 1))
-        limit = int(request.query_params.get('limit', 20))
-        offset = (page - 1) * limit
-
-        paradas_qs = rota.paradas.select_related('imovel')
-        total = paradas_qs.count()
-        paradas = paradas_qs[offset:offset + limit]
-
-        serializer = RotaImovelSerializer(paradas, many=True)
-        return Response({
-            'paradas': serializer.data,
-            'total': total,
-            'page': page,
-            'total_pages': max(1, -(-total // limit)),
-        })
 
 
 # ─── Imóveis ──────────────────────────────────────────────────────────────────
@@ -132,7 +55,7 @@ class ImovelBuscarView(APIView):
         if tipo == 'numero':
             qs = qs.filter(iptu=valor)
         elif tipo == 'qrcode':
-            qs = qs.filter(id_externo=valor)
+            qs = qs.filter(id=valor)
         elif tipo == 'endereco':
             qs = qs.filter(logradouro__icontains=valor)
         else:
@@ -206,15 +129,6 @@ class ColetaCreateView(APIView):
                 codigo=_gerar_codigo(),
                 sincronizado_core=False,
             )
-
-            parada = RotaImovel.objects.filter(
-                rota__coletor=request.user,
-                rota__data=_hoje(),
-                imovel=imovel,
-            ).first()
-            if parada:
-                parada.status = RotaImovel.Status.COLETADO
-                parada.save(update_fields=['status'])
 
         enviado = publicar_coleta(
             coleta_id=str(coleta.id),

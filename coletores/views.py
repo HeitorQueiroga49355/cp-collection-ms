@@ -116,9 +116,8 @@ class MeView(APIView):
 
     def get(self, request):
         user = request.user
-        rota_hoje = user.rotas.filter(data=_hoje()).first()
 
-        data = {
+        return Response({
             'id': str(user.id),
             'nome': user.nome or user.username,
             'matricula': user.username,
@@ -126,19 +125,4 @@ class MeView(APIView):
             'avatar_url': user.foto_perfil or None,
             'zona': user.zona,
             'cargo': user.cargo,
-            'rota_hoje': None,
-        }
-
-        if rota_hoje:
-            data['rota_hoje'] = {
-                'id': str(rota_hoje.id),
-                'codigo': rota_hoje.codigo,
-                'zona': rota_hoje.zona,
-            }
-
-        return Response(data)
-
-
-def _hoje():
-    from django.utils import timezone
-    return timezone.localdate()
+        })

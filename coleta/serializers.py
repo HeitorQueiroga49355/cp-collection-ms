@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import Coleta, Imovel, Rota, RotaImovel
+from .models import Coleta, Imovel
 
 
 # ─── Imovel ───────────────────────────────────────────────────────────────────
@@ -179,22 +179,3 @@ class ColetaDetailSerializer(serializers.ModelSerializer):
         return {'latitude': obj.gps_latitude, 'longitude': obj.gps_longitude}
 
 
-# ─── Rota ─────────────────────────────────────────────────────────────────────
-
-class RotaImovelSerializer(serializers.ModelSerializer):
-    id = serializers.CharField(read_only=True)
-    numero_iptu = serializers.CharField(source='imovel.iptu')
-    endereco = serializers.SerializerMethodField()
-    bairro = serializers.CharField(source='imovel.bairro')
-    morador = serializers.CharField(source='imovel.morador')
-    elegivel = serializers.BooleanField(source='imovel.elegivel')
-
-    class Meta:
-        model = RotaImovel
-        fields = [
-            'id', 'numero_iptu', 'endereco', 'bairro', 'status',
-            'sequencia', 'distancia_metros', 'morador', 'elegivel',
-        ]
-
-    def get_endereco(self, obj):
-        return f"{obj.imovel.logradouro}, {obj.imovel.numero}"
