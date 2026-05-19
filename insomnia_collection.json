@@ -1,340 +1,1224 @@
 {
   "_type": "export",
   "__export_format": 4,
-  "__export_date": "2026-05-15",
-  "__export_source": "cp-collection-ms",
+  "__export_date": "2026-05-19",
+  "__export_source": "cp-collection-ms+coleta-premiada",
   "resources": [
     {
-      "_id": "wrk_cp_collection",
+      "_id": "wrk_coleta_premiada",
       "_type": "workspace",
-      "name": "cp-collection-ms",
-      "description": "API do microserviço de coleta seletiva",
+      "name": "Coleta Premiada (Core + MS)",
+      "description": "Coleção integrada para o fluxo Core (Postgres) ↔ Microsserviço de Coletas (MongoDB) via RabbitMQ. O Authorization de cada request é preenchido automaticamente via Response Tag a partir do login do serviço correspondente.",
       "scope": "collection"
     },
+
     {
       "_id": "env_base",
       "_type": "environment",
-      "parentId": "wrk_cp_collection",
+      "parentId": "wrk_coleta_premiada",
       "name": "Base",
       "data": {
-        "base_url": "http://localhost:8000/api",
-        "token": ""
+        "core_url": "http://localhost:8001/api",
+        "ms_url": "http://localhost:8002/api",
+        "core_email": "gestor@test.com",
+        "core_password": "Senha@123",
+        "ms_matricula": "MAT001",
+        "ms_senha": "Senha@123"
       },
       "color": null,
       "isPrivate": false
     },
 
     {
-      "_id": "fld_auth",
+      "_id": "fld_apresentacao",
       "_type": "request_group",
-      "parentId": "wrk_cp_collection",
-      "name": "1. Auth",
-      "description": "Registro, login e logout. Execute Register ou Login primeiro para obter o token."
+      "parentId": "wrk_coleta_premiada",
+      "name": "🎬 Fluxo da Apresentação",
+      "description": "Ordem cronológica do apresentacao_fluxo.md. Execute de cima para baixo: (1) login Core, (2) login MS, (3) criar imóvel no Core, (4) buscar imóvel propagado no MS, (5) criar coleta no MS, (6) checar status e benefícios.",
+      "metaSortKey": -1000
+    },
+
+    {
+      "_id": "fld_core",
+      "_type": "request_group",
+      "parentId": "wrk_coleta_premiada",
+      "name": "🟦 Core — :8001",
+      "description": "Sistema Core (Coleta-Premiada). Postgres + Django REST. Auth via JWT (access/refresh em /api/token/).",
+      "metaSortKey": -500
     },
     {
-      "_id": "req_register",
-      "_type": "request",
-      "parentId": "fld_auth",
-      "name": "Register",
-      "method": "POST",
-      "url": "{{ base_url }}/auth/register",
-      "headers": [
-        { "name": "Content-Type", "value": "application/json" }
-      ],
-      "body": {
-        "mimeType": "application/json",
-        "text": "{\n  \"matricula\": \"MAT001\",\n  \"senha\": \"Senha@123\",\n  \"nome\": \"João Silva\",\n  \"email\": \"joao@prefeitura.gov.br\",\n  \"zona\": \"Norte\",\n  \"cargo\": \"Agente de coleta\"\n}"
-      },
-      "authentication": {}
+      "_id": "fld_core_auth",
+      "_type": "request_group",
+      "parentId": "fld_core",
+      "name": "1. Autenticação",
+      "description": "Login JWT do Core. O endpoint correto é /api/token/ (e NÃO /api/accounts/token/).",
+      "metaSortKey": -100
     },
     {
-      "_id": "req_login",
+      "_id": "fld_core_users",
+      "_type": "request_group",
+      "parentId": "fld_core",
+      "name": "2. Usuários & Papéis",
+      "description": "Cadastro de gestores/supervisores/moradores e atribuição de roles.",
+      "metaSortKey": -90
+    },
+    {
+      "_id": "fld_core_properties",
+      "_type": "request_group",
+      "parentId": "fld_core",
+      "name": "3. Imóveis (Properties)",
+      "description": "Cadastro de imóveis. Ao criar via POST, o Core publica o evento na fila `imoveis` (RabbitMQ) — o MS consome e persiste no MongoDB.",
+      "metaSortKey": -80
+    },
+    {
+      "_id": "fld_core_programs",
+      "_type": "request_group",
+      "parentId": "fld_core",
+      "name": "4. Programas & Regras",
+      "description": "CRUD de programas e suas regras (pontos por real, mínimo, teto).",
+      "metaSortKey": -70
+    },
+    {
+      "_id": "fld_core_collections",
+      "_type": "request_group",
+      "parentId": "fld_core",
+      "name": "5. Coletas (Collections)",
+      "description": "Coletas materializadas no Core. Estas são as coletas consumidas da fila `coletas` (vindas do MS).",
+      "metaSortKey": -60
+    },
+    {
+      "_id": "fld_core_consolidacao",
+      "_type": "request_group",
+      "parentId": "fld_core",
+      "name": "6. Consolidações & Benefícios",
+      "description": "Execução de consolidações de ciclo e consulta de saldos/descontos por imóvel.",
+      "metaSortKey": -50
+    },
+    {
+      "_id": "fld_core_reports",
+      "_type": "request_group",
+      "parentId": "fld_core",
+      "name": "7. Relatórios",
+      "description": "Relatórios agregados: participação, ranking, impacto.",
+      "metaSortKey": -40
+    },
+    {
+      "_id": "fld_core_me",
+      "_type": "request_group",
+      "parentId": "fld_core",
+      "name": "8. Portal do Cidadão (/me)",
+      "description": "Visão do morador: histórico, pontos, benefícios e programa em que participa.",
+      "metaSortKey": -30
+    },
+    {
+      "_id": "fld_core_disputes",
+      "_type": "request_group",
+      "parentId": "fld_core",
+      "name": "9. Contestações (Disputes)",
+      "description": "Morador contesta uma coleta; gestor analisa.",
+      "metaSortKey": -20
+    },
+
+    {
+      "_id": "fld_ms",
+      "_type": "request_group",
+      "parentId": "wrk_coleta_premiada",
+      "name": "🟩 Microsserviço — :8002",
+      "description": "Microsserviço de Coletas (cp-collection-ms). MongoDB + Django REST. Auth via JWT customizado retornando { token, user }.",
+      "metaSortKey": -400
+    },
+    {
+      "_id": "fld_ms_auth",
+      "_type": "request_group",
+      "parentId": "fld_ms",
+      "name": "1. Autenticação",
+      "description": "Registro/login do Coletor. Login usa matrícula + senha e devolve {token, user}.",
+      "metaSortKey": -100
+    },
+    {
+      "_id": "fld_ms_perfil",
+      "_type": "request_group",
+      "parentId": "fld_ms",
+      "name": "2. Perfil",
+      "description": "Dados do coletor autenticado.",
+      "metaSortKey": -90
+    },
+    {
+      "_id": "fld_ms_rotas",
+      "_type": "request_group",
+      "parentId": "fld_ms",
+      "name": "3. Rotas",
+      "description": "Rota do dia e paradas (imóveis).",
+      "metaSortKey": -80
+    },
+    {
+      "_id": "fld_ms_imoveis",
+      "_type": "request_group",
+      "parentId": "fld_ms",
+      "name": "4. Imóveis",
+      "description": "Busca por número IPTU, QR code (id_externo do Core) e endereço. Detalhe do imóvel.",
+      "metaSortKey": -70
+    },
+    {
+      "_id": "fld_ms_coletas",
+      "_type": "request_group",
+      "parentId": "fld_ms",
+      "name": "5. Coletas",
+      "description": "Criar coleta (publica na fila `coletas`), histórico, pendentes e detalhe.",
+      "metaSortKey": -60
+    },
+    {
+      "_id": "fld_ms_sync",
+      "_type": "request_group",
+      "parentId": "fld_ms",
+      "name": "6. Sincronização",
+      "description": "Envio em lote de coletas offline e status de sincronização.",
+      "metaSortKey": -50
+    },
+
+    {
+      "_id": "req_core_login",
       "_type": "request",
-      "parentId": "fld_auth",
-      "name": "Login",
+      "parentId": "fld_core_auth",
+      "name": "🔑 Login (obter access token)",
       "method": "POST",
-      "url": "{{ base_url }}/auth/login",
-      "headers": [
-        { "name": "Content-Type", "value": "application/json" }
-      ],
+      "url": "{{ _.core_url }}/token/",
+      "headers": [{ "name": "Content-Type", "value": "application/json" }],
       "body": {
         "mimeType": "application/json",
-        "text": "{\n  \"matricula\": \"MAT001\",\n  \"senha\": \"Senha@123\"\n}"
+        "text": "{\n  \"email\": \"{{ _.core_email }}\",\n  \"password\": \"{{ _.core_password }}\"\n}"
       },
       "authentication": {},
-      "description": "Salve o valor de `token` retornado na variável de ambiente `token`."
+      "description": "POST /api/token/ usando email+password. O `access` retornado é injetado automaticamente em todos os outros requests do Core via Response Tag.",
+      "metaSortKey": -1000
     },
     {
-      "_id": "req_logout",
+      "_id": "req_core_token_refresh",
       "_type": "request",
-      "parentId": "fld_auth",
-      "name": "Logout",
+      "parentId": "fld_core_auth",
+      "name": "Refresh Token",
       "method": "POST",
-      "url": "{{ base_url }}/auth/logout",
+      "url": "{{ _.core_url }}/token/refresh/",
+      "headers": [{ "name": "Content-Type", "value": "application/json" }],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"refresh\": \"COLE_O_REFRESH_TOKEN_AQUI\"\n}"
+      },
+      "authentication": {},
+      "metaSortKey": -990
+    },
+    {
+      "_id": "req_core_auth_me",
+      "_type": "request",
+      "parentId": "fld_core_auth",
+      "name": "GET /auth/me (perfil)",
+      "method": "GET",
+      "url": "{{ _.core_url }}/accounts/auth/me",
       "headers": [
-        { "name": "Authorization", "value": "Bearer {{ token }}" },
+        { "name": "Authorization", "value": "Bearer {% response 'body', 'req_core_login', 'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}" }
+      ],
+      "body": {},
+      "authentication": {},
+      "metaSortKey": -980
+    },
+    {
+      "_id": "req_core_auth_logout",
+      "_type": "request",
+      "parentId": "fld_core_auth",
+      "name": "POST /auth/logout",
+      "method": "POST",
+      "url": "{{ _.core_url }}/accounts/auth/logout",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {% response 'body', 'req_core_login', 'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}" },
+        { "name": "Content-Type", "value": "application/json" }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"refresh\": \"COLE_O_REFRESH_TOKEN_AQUI\"\n}"
+      },
+      "authentication": {},
+      "metaSortKey": -970
+    },
+    {
+      "_id": "req_core_auth_create",
+      "_type": "request",
+      "parentId": "fld_core_auth",
+      "name": "POST /auth (criar usuário — gestor/supervisor)",
+      "method": "POST",
+      "url": "{{ _.core_url }}/accounts/auth",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {% response 'body', 'req_core_login', 'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}" },
+        { "name": "Content-Type", "value": "application/json" }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"nome\": \"Morador Apresentação\",\n  \"email\": \"morador@test.com\",\n  \"password\": \"Senha@123\",\n  \"perfil\": \"morador\"\n}"
+      },
+      "authentication": {},
+      "description": "Requer perfil gestor/supervisor. Ajuste o payload conforme o UsuarioCreateSerializer do projeto.",
+      "metaSortKey": -960
+    },
+
+    {
+      "_id": "req_core_users_list",
+      "_type": "request",
+      "parentId": "fld_core_users",
+      "name": "GET /users (listar)",
+      "method": "GET",
+      "url": "{{ _.core_url }}/accounts/users",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {% response 'body', 'req_core_login', 'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}" }
+      ],
+      "body": {},
+      "authentication": {},
+      "metaSortKey": -100
+    },
+    {
+      "_id": "req_core_users_detail",
+      "_type": "request",
+      "parentId": "fld_core_users",
+      "name": "GET /users/:id",
+      "method": "GET",
+      "url": "{{ _.core_url }}/accounts/users/1",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {% response 'body', 'req_core_login', 'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}" }
+      ],
+      "body": {},
+      "authentication": {},
+      "description": "Substitua `1` pelo id real do usuário.",
+      "metaSortKey": -90
+    },
+    {
+      "_id": "req_core_roles_list",
+      "_type": "request",
+      "parentId": "fld_core_users",
+      "name": "GET /roles (listar)",
+      "method": "GET",
+      "url": "{{ _.core_url }}/accounts/roles",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {% response 'body', 'req_core_login', 'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}" }
+      ],
+      "body": {},
+      "authentication": {},
+      "metaSortKey": -80
+    },
+    {
+      "_id": "req_core_roles_create",
+      "_type": "request",
+      "parentId": "fld_core_users",
+      "name": "POST /roles (criar)",
+      "method": "POST",
+      "url": "{{ _.core_url }}/accounts/roles",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {% response 'body', 'req_core_login', 'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}" },
+        { "name": "Content-Type", "value": "application/json" }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"nome\": \"supervisor_apresentacao\",\n  \"descricao\": \"Papel demo para apresentação\",\n  \"ativo\": true\n}"
+      },
+      "authentication": {},
+      "metaSortKey": -70
+    },
+    {
+      "_id": "req_core_user_role_add",
+      "_type": "request",
+      "parentId": "fld_core_users",
+      "name": "POST /users/:id/roles/:roleId",
+      "method": "POST",
+      "url": "{{ _.core_url }}/accounts/users/1/roles/1",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {% response 'body', 'req_core_login', 'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}" }
+      ],
+      "body": {},
+      "authentication": {},
+      "metaSortKey": -60
+    },
+
+    {
+      "_id": "req_core_properties_list",
+      "_type": "request",
+      "parentId": "fld_core_properties",
+      "name": "GET /properties (listar)",
+      "method": "GET",
+      "url": "{{ _.core_url }}/program/properties",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {% response 'body', 'req_core_login', 'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}" }
+      ],
+      "body": {},
+      "authentication": {},
+      "metaSortKey": -100
+    },
+    {
+      "_id": "req_core_properties_create",
+      "_type": "request",
+      "parentId": "fld_core_properties",
+      "name": "POST /properties (criar — publica na fila `imoveis`)",
+      "method": "POST",
+      "url": "{{ _.core_url }}/program/properties",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {% response 'body', 'req_core_login', 'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}" },
+        { "name": "Content-Type", "value": "application/json" }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"iptu\": \"999888777\",\n  \"logradouro\": \"Rua da Apresentação\",\n  \"numero\": \"123\",\n  \"bairro\": \"Centro\",\n  \"elegivel\": true\n}"
+      },
+      "authentication": {},
+      "description": "Passo 2.1 da apresentação. Ao salvar, o Core publica o evento na fila `imoveis`, e o MS persiste no MongoDB.",
+      "metaSortKey": -90
+    },
+    {
+      "_id": "req_core_properties_detail",
+      "_type": "request",
+      "parentId": "fld_core_properties",
+      "name": "GET /properties/:id",
+      "method": "GET",
+      "url": "{{ _.core_url }}/program/properties/1",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {% response 'body', 'req_core_login', 'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}" }
+      ],
+      "body": {},
+      "authentication": {},
+      "metaSortKey": -80
+    },
+    {
+      "_id": "req_core_properties_update",
+      "_type": "request",
+      "parentId": "fld_core_properties",
+      "name": "PATCH /properties/:id",
+      "method": "PATCH",
+      "url": "{{ _.core_url }}/program/properties/1",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {% response 'body', 'req_core_login', 'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}" },
+        { "name": "Content-Type", "value": "application/json" }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"elegivel\": true\n}"
+      },
+      "authentication": {},
+      "metaSortKey": -70
+    },
+    {
+      "_id": "req_core_properties_add_user",
+      "_type": "request",
+      "parentId": "fld_core_properties",
+      "name": "POST /properties/:id/users (vincular morador)",
+      "method": "POST",
+      "url": "{{ _.core_url }}/program/properties/1/users",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {% response 'body', 'req_core_login', 'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}" },
+        { "name": "Content-Type", "value": "application/json" }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"user_id\": 2\n}"
+      },
+      "authentication": {},
+      "metaSortKey": -60
+    },
+    {
+      "_id": "req_core_properties_remove_user",
+      "_type": "request",
+      "parentId": "fld_core_properties",
+      "name": "DELETE /properties/:id/users/:userId",
+      "method": "DELETE",
+      "url": "{{ _.core_url }}/program/properties/1/users/2",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {% response 'body', 'req_core_login', 'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}" }
+      ],
+      "body": {},
+      "authentication": {},
+      "metaSortKey": -50
+    },
+
+    {
+      "_id": "req_core_programs_list",
+      "_type": "request",
+      "parentId": "fld_core_programs",
+      "name": "GET /programs (listar)",
+      "method": "GET",
+      "url": "{{ _.core_url }}/program/programs",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {% response 'body', 'req_core_login', 'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}" }
+      ],
+      "body": {},
+      "authentication": {},
+      "metaSortKey": -100
+    },
+    {
+      "_id": "req_core_programs_create",
+      "_type": "request",
+      "parentId": "fld_core_programs",
+      "name": "POST /programs (criar)",
+      "method": "POST",
+      "url": "{{ _.core_url }}/program/programs",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {% response 'body', 'req_core_login', 'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}" },
+        { "name": "Content-Type", "value": "application/json" }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"nome\": \"Programa Apresentação\",\n  \"data_inicio\": \"2026-05-01\",\n  \"data_fim\": \"2026-12-31\",\n  \"desconto_maximo\": \"40.00\",\n  \"ativo\": true\n}"
+      },
+      "authentication": {},
+      "metaSortKey": -90
+    },
+    {
+      "_id": "req_core_programs_detail",
+      "_type": "request",
+      "parentId": "fld_core_programs",
+      "name": "GET /programs/:id",
+      "method": "GET",
+      "url": "{{ _.core_url }}/program/programs/1",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {% response 'body', 'req_core_login', 'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}" }
+      ],
+      "body": {},
+      "authentication": {},
+      "metaSortKey": -80
+    },
+    {
+      "_id": "req_core_programs_rules_get",
+      "_type": "request",
+      "parentId": "fld_core_programs",
+      "name": "GET /programs/:id/rules",
+      "method": "GET",
+      "url": "{{ _.core_url }}/program/programs/1/rules",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {% response 'body', 'req_core_login', 'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}" }
+      ],
+      "body": {},
+      "authentication": {},
+      "metaSortKey": -70
+    },
+    {
+      "_id": "req_core_programs_rules_patch",
+      "_type": "request",
+      "parentId": "fld_core_programs",
+      "name": "PATCH /programs/:id/rules",
+      "method": "PATCH",
+      "url": "{{ _.core_url }}/program/programs/1/rules",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {% response 'body', 'req_core_login', 'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}" },
+        { "name": "Content-Type", "value": "application/json" }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"pontos_por_real\": \"10.00\",\n  \"minimo_para_beneficio\": \"50.00\"\n}"
+      },
+      "authentication": {},
+      "metaSortKey": -60
+    },
+
+    {
+      "_id": "req_core_collections_list",
+      "_type": "request",
+      "parentId": "fld_core_collections",
+      "name": "GET /collections (listar)",
+      "method": "GET",
+      "url": "{{ _.core_url }}/collection/collections",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {% response 'body', 'req_core_login', 'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}" }
+      ],
+      "body": {},
+      "authentication": {},
+      "description": "Lista todas as coletas registradas no Core (incluindo as recebidas via fila `coletas` do MS).",
+      "metaSortKey": -100
+    },
+    {
+      "_id": "req_core_collections_create",
+      "_type": "request",
+      "parentId": "fld_core_collections",
+      "name": "POST /collections (criar manual — gestor)",
+      "method": "POST",
+      "url": "{{ _.core_url }}/collection/collections",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {% response 'body', 'req_core_login', 'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}" },
+        { "name": "Content-Type", "value": "application/json" }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"imovel\": 1,\n  \"pontuacao\": \"3.50\",\n  \"peso_total_kg\": \"2.50\",\n  \"data_hora\": \"2026-05-19T10:00:00Z\"\n}"
+      },
+      "authentication": {},
+      "description": "Entrada manual no Core (normalmente as coletas chegam via fila).",
+      "metaSortKey": -90
+    },
+    {
+      "_id": "req_core_collections_detail",
+      "_type": "request",
+      "parentId": "fld_core_collections",
+      "name": "GET /collections/:id",
+      "method": "GET",
+      "url": "{{ _.core_url }}/collection/collections/1",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {% response 'body', 'req_core_login', 'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}" }
+      ],
+      "body": {},
+      "authentication": {},
+      "metaSortKey": -80
+    },
+    {
+      "_id": "req_core_collections_evidences_list",
+      "_type": "request",
+      "parentId": "fld_core_collections",
+      "name": "GET /collections/:id/evidences",
+      "method": "GET",
+      "url": "{{ _.core_url }}/collection/collections/1/evidences",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {% response 'body', 'req_core_login', 'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}" }
+      ],
+      "body": {},
+      "authentication": {},
+      "metaSortKey": -70
+    },
+    {
+      "_id": "req_core_collections_evidences_create",
+      "_type": "request",
+      "parentId": "fld_core_collections",
+      "name": "POST /collections/:id/evidences",
+      "method": "POST",
+      "url": "{{ _.core_url }}/collection/collections/1/evidences",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {% response 'body', 'req_core_login', 'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}" },
+        { "name": "Content-Type", "value": "application/json" }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"foto_url\": \"https://exemplo.com/evidencia.jpg\",\n  \"observacao\": \"Foto da apresentação\"\n}"
+      },
+      "authentication": {},
+      "metaSortKey": -60
+    },
+
+    {
+      "_id": "req_core_consolidations_run",
+      "_type": "request",
+      "parentId": "fld_core_consolidacao",
+      "name": "POST /consolidations/run",
+      "method": "POST",
+      "url": "{{ _.core_url }}/program/consolidations/run",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {% response 'body', 'req_core_login', 'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}" },
+        { "name": "Content-Type", "value": "application/json" }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"programa_id\": 1,\n  \"ciclo\": \"05-2026\"\n}"
+      },
+      "authentication": {},
+      "description": "Dispara a consolidação do ciclo: soma pontuação por imóvel, converte em desconto e aplica teto.",
+      "metaSortKey": -100
+    },
+    {
+      "_id": "req_core_consolidations_list",
+      "_type": "request",
+      "parentId": "fld_core_consolidacao",
+      "name": "GET /consolidations (listar)",
+      "method": "GET",
+      "url": "{{ _.core_url }}/program/consolidations",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {% response 'body', 'req_core_login', 'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}" }
+      ],
+      "body": {},
+      "authentication": {},
+      "metaSortKey": -90
+    },
+    {
+      "_id": "req_core_consolidations_detail",
+      "_type": "request",
+      "parentId": "fld_core_consolidacao",
+      "name": "GET /consolidations/:id",
+      "method": "GET",
+      "url": "{{ _.core_url }}/program/consolidations/1",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {% response 'body', 'req_core_login', 'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}" }
+      ],
+      "body": {},
+      "authentication": {},
+      "metaSortKey": -80
+    },
+    {
+      "_id": "req_core_benefits_list",
+      "_type": "request",
+      "parentId": "fld_core_consolidacao",
+      "name": "GET /benefits (listar saldos)",
+      "method": "GET",
+      "url": "{{ _.core_url }}/program/benefits",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {% response 'body', 'req_core_login', 'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}" }
+      ],
+      "body": {},
+      "authentication": {},
+      "metaSortKey": -70
+    },
+    {
+      "_id": "req_core_benefits_detail",
+      "_type": "request",
+      "parentId": "fld_core_consolidacao",
+      "name": "GET /benefits/:propertyId (saldo do imóvel)",
+      "method": "GET",
+      "url": "{{ _.core_url }}/program/benefits/1",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {% response 'body', 'req_core_login', 'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}" }
+      ],
+      "body": {},
+      "authentication": {},
+      "description": "Passo 4.2 da apresentação. Substitua `1` pelo id do imóvel cadastrado.",
+      "metaSortKey": -60
+    },
+
+    {
+      "_id": "req_core_reports_participation",
+      "_type": "request",
+      "parentId": "fld_core_reports",
+      "name": "GET /reports/participation",
+      "method": "GET",
+      "url": "{{ _.core_url }}/program/reports/participation",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {% response 'body', 'req_core_login', 'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}" }
+      ],
+      "body": {},
+      "authentication": {},
+      "metaSortKey": -100
+    },
+    {
+      "_id": "req_core_reports_ranking",
+      "_type": "request",
+      "parentId": "fld_core_reports",
+      "name": "GET /reports/ranking",
+      "method": "GET",
+      "url": "{{ _.core_url }}/program/reports/ranking",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {% response 'body', 'req_core_login', 'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}" }
+      ],
+      "body": {},
+      "authentication": {},
+      "metaSortKey": -90
+    },
+    {
+      "_id": "req_core_reports_impact",
+      "_type": "request",
+      "parentId": "fld_core_reports",
+      "name": "GET /reports/impact",
+      "method": "GET",
+      "url": "{{ _.core_url }}/program/reports/impact",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {% response 'body', 'req_core_login', 'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}" }
+      ],
+      "body": {},
+      "authentication": {},
+      "metaSortKey": -80
+    },
+
+    {
+      "_id": "req_core_me_history",
+      "_type": "request",
+      "parentId": "fld_core_me",
+      "name": "GET /me/history",
+      "method": "GET",
+      "url": "{{ _.core_url }}/accounts/me/history",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {% response 'body', 'req_core_login', 'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}" }
+      ],
+      "body": {},
+      "authentication": {},
+      "metaSortKey": -100
+    },
+    {
+      "_id": "req_core_me_points",
+      "_type": "request",
+      "parentId": "fld_core_me",
+      "name": "GET /me/points",
+      "method": "GET",
+      "url": "{{ _.core_url }}/accounts/me/points",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {% response 'body', 'req_core_login', 'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}" }
+      ],
+      "body": {},
+      "authentication": {},
+      "metaSortKey": -90
+    },
+    {
+      "_id": "req_core_me_benefits",
+      "_type": "request",
+      "parentId": "fld_core_me",
+      "name": "GET /me/benefits",
+      "method": "GET",
+      "url": "{{ _.core_url }}/accounts/me/benefits",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {% response 'body', 'req_core_login', 'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}" }
+      ],
+      "body": {},
+      "authentication": {},
+      "metaSortKey": -80
+    },
+    {
+      "_id": "req_core_me_program",
+      "_type": "request",
+      "parentId": "fld_core_me",
+      "name": "GET /me/program",
+      "method": "GET",
+      "url": "{{ _.core_url }}/accounts/me/program",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {% response 'body', 'req_core_login', 'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}" }
+      ],
+      "body": {},
+      "authentication": {},
+      "metaSortKey": -70
+    },
+
+    {
+      "_id": "req_core_disputes_list",
+      "_type": "request",
+      "parentId": "fld_core_disputes",
+      "name": "GET /disputes (listar)",
+      "method": "GET",
+      "url": "{{ _.core_url }}/collection/disputes",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {% response 'body', 'req_core_login', 'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}" }
+      ],
+      "body": {},
+      "authentication": {},
+      "metaSortKey": -100
+    },
+    {
+      "_id": "req_core_disputes_create",
+      "_type": "request",
+      "parentId": "fld_core_disputes",
+      "name": "POST /disputes (morador abre)",
+      "method": "POST",
+      "url": "{{ _.core_url }}/collection/disputes",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {% response 'body', 'req_core_login', 'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}" },
+        { "name": "Content-Type", "value": "application/json" }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"coleta\": 1,\n  \"motivo\": \"Pesagem incorreta\"\n}"
+      },
+      "authentication": {},
+      "metaSortKey": -90
+    },
+    {
+      "_id": "req_core_disputes_detail",
+      "_type": "request",
+      "parentId": "fld_core_disputes",
+      "name": "GET /disputes/:id",
+      "method": "GET",
+      "url": "{{ _.core_url }}/collection/disputes/1",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {% response 'body', 'req_core_login', 'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}" }
+      ],
+      "body": {},
+      "authentication": {},
+      "metaSortKey": -80
+    },
+    {
+      "_id": "req_core_disputes_update",
+      "_type": "request",
+      "parentId": "fld_core_disputes",
+      "name": "PATCH /disputes/:id (gestor analisa)",
+      "method": "PATCH",
+      "url": "{{ _.core_url }}/collection/disputes/1",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {% response 'body', 'req_core_login', 'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}" },
+        { "name": "Content-Type", "value": "application/json" }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"status\": \"aceita\",\n  \"resposta\": \"Pesagem corrigida\"\n}"
+      },
+      "authentication": {},
+      "metaSortKey": -70
+    },
+
+    {
+      "_id": "req_ms_register",
+      "_type": "request",
+      "parentId": "fld_ms_auth",
+      "name": "POST /auth/register",
+      "method": "POST",
+      "url": "{{ _.ms_url }}/auth/register",
+      "headers": [{ "name": "Content-Type", "value": "application/json" }],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"matricula\": \"{{ _.ms_matricula }}\",\n  \"senha\": \"{{ _.ms_senha }}\",\n  \"nome\": \"João Silva\",\n  \"email\": \"joao@prefeitura.gov.br\",\n  \"zona\": \"Norte\",\n  \"cargo\": \"Agente de coleta\"\n}"
+      },
+      "authentication": {},
+      "metaSortKey": -1010
+    },
+    {
+      "_id": "req_ms_login",
+      "_type": "request",
+      "parentId": "fld_ms_auth",
+      "name": "🔑 Login (obter access token)",
+      "method": "POST",
+      "url": "{{ _.ms_url }}/auth/login",
+      "headers": [{ "name": "Content-Type", "value": "application/json" }],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"matricula\": \"{{ _.ms_matricula }}\",\n  \"senha\": \"{{ _.ms_senha }}\"\n}"
+      },
+      "authentication": {},
+      "description": "POST /api/auth/login no MS usando matrícula + senha. O `token` retornado é injetado automaticamente em todos os outros requests do MS via Response Tag.",
+      "metaSortKey": -1000
+    },
+    {
+      "_id": "req_ms_logout",
+      "_type": "request",
+      "parentId": "fld_ms_auth",
+      "name": "POST /auth/logout",
+      "method": "POST",
+      "url": "{{ _.ms_url }}/auth/logout",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {% response 'body', 'req_ms_login', 'b64::JC50b2tlbg==::46b', 'no-history', 60, 'never' %}" },
         { "name": "Content-Type", "value": "application/json" }
       ],
       "body": { "mimeType": "application/json", "text": "{}" },
-      "authentication": {}
+      "authentication": {},
+      "metaSortKey": -990
     },
 
     {
-      "_id": "fld_me",
-      "_type": "request_group",
-      "parentId": "wrk_cp_collection",
-      "name": "2. Perfil",
-      "description": "Dados do coletor autenticado. Use para confirmar o token e obter rota_hoje."
-    },
-    {
-      "_id": "req_me",
+      "_id": "req_ms_me",
       "_type": "request",
-      "parentId": "fld_me",
-      "name": "Me (perfil)",
+      "parentId": "fld_ms_perfil",
+      "name": "GET /me (perfil)",
       "method": "GET",
-      "url": "{{ base_url }}/me",
+      "url": "{{ _.ms_url }}/me",
       "headers": [
-        { "name": "Authorization", "value": "Bearer {{ token }}" }
+        { "name": "Authorization", "value": "Bearer {% response 'body', 'req_ms_login', 'b64::JC50b2tlbg==::46b', 'no-history', 60, 'never' %}" }
       ],
       "body": {},
       "authentication": {},
-      "description": "Retorna o perfil do coletor e, se existir, rota_hoje com o id da rota do dia."
+      "description": "Retorna perfil do coletor + rota_hoje (se houver).",
+      "metaSortKey": -100
     },
 
     {
-      "_id": "fld_rotas",
-      "_type": "request_group",
-      "parentId": "wrk_cp_collection",
-      "name": "3. Rotas",
-      "description": "Consulta rota do dia e paradas. Obtenha o id da rota via GET /me ou GET /rotas/hoje."
-    },
-    {
-      "_id": "req_rota_hoje",
+      "_id": "req_ms_rota_hoje",
       "_type": "request",
-      "parentId": "fld_rotas",
-      "name": "Rota de Hoje",
+      "parentId": "fld_ms_rotas",
+      "name": "GET /rotas/hoje",
       "method": "GET",
-      "url": "{{ base_url }}/rotas/hoje",
+      "url": "{{ _.ms_url }}/rotas/hoje",
       "headers": [
-        { "name": "Authorization", "value": "Bearer {{ token }}" }
+        { "name": "Authorization", "value": "Bearer {% response 'body', 'req_ms_login', 'b64::JC50b2tlbg==::46b', 'no-history', 60, 'never' %}" }
       ],
       "body": {},
       "authentication": {},
-      "description": "Retorna resumo da rota do dia: progresso, próximo imóvel, totais de kg e pontos."
+      "metaSortKey": -100
     },
     {
-      "_id": "req_rota_paradas",
+      "_id": "req_ms_rota_paradas",
       "_type": "request",
-      "parentId": "fld_rotas",
-      "name": "Paradas da Rota",
+      "parentId": "fld_ms_rotas",
+      "name": "GET /rotas/:rota_id/paradas",
       "method": "GET",
-      "url": "{{ base_url }}/rotas/:rota_id/paradas",
+      "url": "{{ _.ms_url }}/rotas/SUBSTITUA_ROTA_ID/paradas?page=1&limit=20",
       "headers": [
-        { "name": "Authorization", "value": "Bearer {{ token }}" }
+        { "name": "Authorization", "value": "Bearer {% response 'body', 'req_ms_login', 'b64::JC50b2tlbg==::46b', 'no-history', 60, 'never' %}" }
       ],
       "parameters": [
         { "name": "page", "value": "1" },
         { "name": "limit", "value": "20" }
       ],
-      "pathParameters": [
-        { "name": "rota_id", "value": "SUBSTITUA_PELO_ID_DA_ROTA" }
-      ],
       "body": {},
       "authentication": {},
-      "description": "Lista paginada das paradas. Substitua :rota_id pelo id retornado em /rotas/hoje ou /me."
+      "metaSortKey": -90
     },
 
     {
-      "_id": "fld_imoveis",
-      "_type": "request_group",
-      "parentId": "wrk_cp_collection",
-      "name": "4. Imóveis",
-      "description": "Busca e detalhes de imóveis. Use o id do imóvel para registrar coletas."
-    },
-    {
-      "_id": "req_imovel_buscar_numero",
+      "_id": "req_ms_imovel_numero",
       "_type": "request",
-      "parentId": "fld_imoveis",
-      "name": "Buscar por Número IPTU",
+      "parentId": "fld_ms_imoveis",
+      "name": "GET /imoveis/buscar (por numero IPTU)",
       "method": "GET",
-      "url": "{{ base_url }}/imoveis/buscar",
+      "url": "{{ _.ms_url }}/imoveis/buscar?tipo=numero&valor=999888777",
       "headers": [
-        { "name": "Authorization", "value": "Bearer {{ token }}" }
+        { "name": "Authorization", "value": "Bearer {% response 'body', 'req_ms_login', 'b64::JC50b2tlbg==::46b', 'no-history', 60, 'never' %}" }
       ],
       "parameters": [
         { "name": "tipo", "value": "numero" },
-        { "name": "valor", "value": "1234567890" }
+        { "name": "valor", "value": "999888777" }
       ],
       "body": {},
-      "authentication": {}
+      "authentication": {},
+      "metaSortKey": -100
     },
     {
-      "_id": "req_imovel_buscar_qrcode",
+      "_id": "req_ms_imovel_qrcode",
       "_type": "request",
-      "parentId": "fld_imoveis",
-      "name": "Buscar por QR Code",
+      "parentId": "fld_ms_imoveis",
+      "name": "GET /imoveis/buscar (por QR code → id externo do Core)",
       "method": "GET",
-      "url": "{{ base_url }}/imoveis/buscar",
+      "url": "{{ _.ms_url }}/imoveis/buscar?tipo=qrcode&valor=COLE_O_ID_GERADO_NO_CORE",
       "headers": [
-        { "name": "Authorization", "value": "Bearer {{ token }}" }
+        { "name": "Authorization", "value": "Bearer {% response 'body', 'req_ms_login', 'b64::JC50b2tlbg==::46b', 'no-history', 60, 'never' %}" }
       ],
       "parameters": [
         { "name": "tipo", "value": "qrcode" },
-        { "name": "valor", "value": "EXT-ABC-001" }
+        { "name": "valor", "value": "COLE_O_ID_GERADO_NO_CORE" }
       ],
       "body": {},
-      "authentication": {}
+      "authentication": {},
+      "description": "Passo 2.2 da apresentação: aqui o `valor` deve ser o id do imóvel retornado pelo Core (id_externo). O MS responde com o ObjectId do Mongo, que é o `imovel_id` usado para criar coletas.",
+      "metaSortKey": -90
     },
     {
-      "_id": "req_imovel_buscar_endereco",
+      "_id": "req_ms_imovel_endereco",
       "_type": "request",
-      "parentId": "fld_imoveis",
-      "name": "Buscar por Endereço",
+      "parentId": "fld_ms_imoveis",
+      "name": "GET /imoveis/buscar (por endereço)",
       "method": "GET",
-      "url": "{{ base_url }}/imoveis/buscar",
+      "url": "{{ _.ms_url }}/imoveis/buscar?tipo=endereco&valor=Rua%20da%20Apresenta%C3%A7%C3%A3o",
       "headers": [
-        { "name": "Authorization", "value": "Bearer {{ token }}" }
+        { "name": "Authorization", "value": "Bearer {% response 'body', 'req_ms_login', 'b64::JC50b2tlbg==::46b', 'no-history', 60, 'never' %}" }
       ],
       "parameters": [
         { "name": "tipo", "value": "endereco" },
-        { "name": "valor", "value": "Rua das Flores" },
+        { "name": "valor", "value": "Rua da Apresentação" },
         { "name": "rota_id", "value": "" }
       ],
       "body": {},
       "authentication": {},
-      "description": "rota_id é opcional: filtra apenas imóveis da rota informada."
+      "description": "rota_id é opcional: filtra apenas imóveis da rota informada.",
+      "metaSortKey": -80
     },
     {
-      "_id": "req_imovel_detail",
+      "_id": "req_ms_imovel_detail",
       "_type": "request",
-      "parentId": "fld_imoveis",
-      "name": "Detalhe do Imóvel",
+      "parentId": "fld_ms_imoveis",
+      "name": "GET /imoveis/:imovel_id (detalhe)",
       "method": "GET",
-      "url": "{{ base_url }}/imoveis/:imovel_id",
+      "url": "{{ _.ms_url }}/imoveis/SUBSTITUA_OBJECTID_DO_IMOVEL",
       "headers": [
-        { "name": "Authorization", "value": "Bearer {{ token }}" }
-      ],
-      "pathParameters": [
-        { "name": "imovel_id", "value": "SUBSTITUA_PELO_ID_DO_IMOVEL" }
+        { "name": "Authorization", "value": "Bearer {% response 'body', 'req_ms_login', 'b64::JC50b2tlbg==::46b', 'no-history', 60, 'never' %}" }
       ],
       "body": {},
       "authentication": {},
-      "description": "Retorna dados completos do imóvel incluindo histórico de coletas e elegibilidade."
+      "metaSortKey": -70
     },
 
     {
-      "_id": "fld_coletas",
-      "_type": "request_group",
-      "parentId": "wrk_cp_collection",
-      "name": "5. Coletas",
-      "description": "Registro e consulta de coletas. Tenha o imovel_id em mãos antes de criar uma coleta."
-    },
-    {
-      "_id": "req_coleta_create",
+      "_id": "req_ms_coleta_create",
       "_type": "request",
-      "parentId": "fld_coletas",
-      "name": "Criar Coleta",
+      "parentId": "fld_ms_coletas",
+      "name": "POST /coletas (criar — publica na fila `coletas`)",
       "method": "POST",
-      "url": "{{ base_url }}/coletas",
+      "url": "{{ _.ms_url }}/coletas",
       "headers": [
-        { "name": "Authorization", "value": "Bearer {{ token }}" },
+        { "name": "Authorization", "value": "Bearer {% response 'body', 'req_ms_login', 'b64::JC50b2tlbg==::46b', 'no-history', 60, 'never' %}" },
         { "name": "Content-Type", "value": "application/json" }
       ],
       "body": {
         "mimeType": "application/json",
-        "text": "{\n  \"imovel_id\": \"SUBSTITUA_PELO_ID_DO_IMOVEL\",\n  \"data_hora\": \"2026-05-15T08:30:00-03:00\",\n  \"materiais\": [\n    { \"tipo\": \"plastico\", \"peso_kg\": 2.500 },\n    { \"tipo\": \"papel\", \"peso_kg\": 1.200 }\n  ],\n  \"gps\": {\n    \"latitude\": -23.5505,\n    \"longitude\": -46.6333\n  },\n  \"foto_url\": null,\n  \"observacoes\": \"\",\n  \"offline_id\": null\n}"
+        "text": "{\n  \"imovel_id\": \"SUBSTITUA_OBJECTID_DO_IMOVEL\",\n  \"data_hora\": \"2026-05-19T10:00:00Z\",\n  \"materiais\": [\n    { \"tipo\": \"plastico\", \"peso_kg\": \"1.5\" },\n    { \"tipo\": \"papel\",    \"peso_kg\": \"1.0\" }\n  ],\n  \"gps\": {\n    \"latitude\": -6.1086,\n    \"longitude\": -38.2089\n  },\n  \"foto_url\": null,\n  \"observacoes\": \"\",\n  \"offline_id\": null\n}"
       },
       "authentication": {},
-      "description": "Tipos de material aceitos: plastico | papel | vidro | metal | organico. offline_id é UUID gerado pelo app para idempotência offline."
+      "description": "Passo 3.1 da apresentação. Tipos aceitos: plastico | papel | vidro | metal | organico. `sincronizado: true` indica que a coleta foi publicada com sucesso na fila do RabbitMQ.",
+      "metaSortKey": -100
     },
     {
-      "_id": "req_coleta_detail",
+      "_id": "req_ms_coleta_historico",
       "_type": "request",
-      "parentId": "fld_coletas",
-      "name": "Detalhe da Coleta",
+      "parentId": "fld_ms_coletas",
+      "name": "GET /coletas/historico",
       "method": "GET",
-      "url": "{{ base_url }}/coletas/:coleta_id",
+      "url": "{{ _.ms_url }}/coletas/historico?tipo_periodo=hoje&page=1&limit=30",
       "headers": [
-        { "name": "Authorization", "value": "Bearer {{ token }}" }
-      ],
-      "pathParameters": [
-        { "name": "coleta_id", "value": "SUBSTITUA_PELO_ID_DA_COLETA" }
-      ],
-      "body": {},
-      "authentication": {}
-    },
-    {
-      "_id": "req_coleta_historico",
-      "_type": "request",
-      "parentId": "fld_coletas",
-      "name": "Histórico de Coletas",
-      "method": "GET",
-      "url": "{{ base_url }}/coletas/historico",
-      "headers": [
-        { "name": "Authorization", "value": "Bearer {{ token }}" }
+        { "name": "Authorization", "value": "Bearer {% response 'body', 'req_ms_login', 'b64::JC50b2tlbg==::46b', 'no-history', 60, 'never' %}" }
       ],
       "parameters": [
-        { "name": "tipo_periodo", "value": "hoje", "description": "hoje | ontem | semana | mes" },
+        { "name": "tipo_periodo", "value": "hoje" },
         { "name": "page", "value": "1" },
         { "name": "limit", "value": "30" }
       ],
       "body": {},
       "authentication": {},
-      "description": "tipo_periodo: hoje | ontem | semana | mes. Pode usar data=YYYY-MM-DD no lugar de tipo_periodo."
+      "description": "tipo_periodo: hoje | ontem | semana | mes. Pode usar data=YYYY-MM-DD no lugar de tipo_periodo.",
+      "metaSortKey": -90
     },
     {
-      "_id": "req_coleta_pendentes",
+      "_id": "req_ms_coleta_pendentes",
       "_type": "request",
-      "parentId": "fld_coletas",
-      "name": "Coletas Pendentes (não sincronizadas)",
+      "parentId": "fld_ms_coletas",
+      "name": "GET /coletas/pendentes",
       "method": "GET",
-      "url": "{{ base_url }}/coletas/pendentes",
+      "url": "{{ _.ms_url }}/coletas/pendentes",
       "headers": [
-        { "name": "Authorization", "value": "Bearer {{ token }}" }
+        { "name": "Authorization", "value": "Bearer {% response 'body', 'req_ms_login', 'b64::JC50b2tlbg==::46b', 'no-history', 60, 'never' %}" }
       ],
       "body": {},
       "authentication": {},
-      "description": "Lista coletas que ainda não foram sincronizadas com o core (sincronizado_core=false)."
+      "metaSortKey": -80
+    },
+    {
+      "_id": "req_ms_coleta_detail",
+      "_type": "request",
+      "parentId": "fld_ms_coletas",
+      "name": "GET /coletas/:coleta_id (detalhe)",
+      "method": "GET",
+      "url": "{{ _.ms_url }}/coletas/SUBSTITUA_OBJECTID_DA_COLETA",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {% response 'body', 'req_ms_login', 'b64::JC50b2tlbg==::46b', 'no-history', 60, 'never' %}" }
+      ],
+      "body": {},
+      "authentication": {},
+      "metaSortKey": -70
     },
 
     {
-      "_id": "fld_sincronizacao",
-      "_type": "request_group",
-      "parentId": "wrk_cp_collection",
-      "name": "6. Sincronização",
-      "description": "Envio em lote de coletas offline e consulta de status de sincronização."
-    },
-    {
-      "_id": "req_sincronizar",
+      "_id": "req_ms_sincronizar",
       "_type": "request",
-      "parentId": "fld_sincronizacao",
-      "name": "Sincronizar Coletas (batch)",
+      "parentId": "fld_ms_sync",
+      "name": "POST /sincronizar (batch offline)",
       "method": "POST",
-      "url": "{{ base_url }}/sincronizar",
+      "url": "{{ _.ms_url }}/sincronizar",
       "headers": [
-        { "name": "Authorization", "value": "Bearer {{ token }}" },
+        { "name": "Authorization", "value": "Bearer {% response 'body', 'req_ms_login', 'b64::JC50b2tlbg==::46b', 'no-history', 60, 'never' %}" },
         { "name": "Content-Type", "value": "application/json" }
       ],
       "body": {
         "mimeType": "application/json",
-        "text": "{\n  \"coletas\": [\n    {\n      \"offline_id\": \"550e8400-e29b-41d4-a716-446655440000\",\n      \"imovel_id\": \"SUBSTITUA_PELO_ID_DO_IMOVEL\",\n      \"data_hora\": \"2026-05-15T07:15:00-03:00\",\n      \"materiais\": [\n        { \"tipo\": \"metal\", \"peso_kg\": 3.000 },\n        { \"tipo\": \"vidro\", \"peso_kg\": 1.800 }\n      ],\n      \"gps\": {\n        \"latitude\": -23.5505,\n        \"longitude\": -46.6333\n      },\n      \"foto_url\": null\n    }\n  ]\n}"
+        "text": "{\n  \"coletas\": [\n    {\n      \"offline_id\": \"550e8400-e29b-41d4-a716-446655440000\",\n      \"imovel_id\": \"SUBSTITUA_OBJECTID_DO_IMOVEL\",\n      \"data_hora\": \"2026-05-19T07:15:00-03:00\",\n      \"materiais\": [\n        { \"tipo\": \"metal\", \"peso_kg\": \"3.0\" },\n        { \"tipo\": \"vidro\", \"peso_kg\": \"1.8\" }\n      ],\n      \"gps\": { \"latitude\": -6.1086, \"longitude\": -38.2089 },\n      \"foto_url\": null\n    }\n  ]\n}"
       },
       "authentication": {},
-      "description": "Retorna 200 se tudo sincronizou, 207 se houve erros parciais."
+      "description": "200 = tudo sincronizado, 207 = erros parciais.",
+      "metaSortKey": -100
     },
     {
-      "_id": "req_sincronizacao_status",
+      "_id": "req_ms_sincronizacao_status",
       "_type": "request",
-      "parentId": "fld_sincronizacao",
-      "name": "Status de Sincronização",
+      "parentId": "fld_ms_sync",
+      "name": "GET /sincronizacao/status",
       "method": "GET",
-      "url": "{{ base_url }}/sincronizacao/status",
+      "url": "{{ _.ms_url }}/sincronizacao/status",
       "headers": [
-        { "name": "Authorization", "value": "Bearer {{ token }}" }
+        { "name": "Authorization", "value": "Bearer {% response 'body', 'req_ms_login', 'b64::JC50b2tlbg==::46b', 'no-history', 60, 'never' %}" }
       ],
       "body": {},
       "authentication": {},
-      "description": "Retorna pendentes, sincronizadas_hoje e última sincronização bem-sucedida."
+      "description": "Passo 4.1 da apresentação. Retorna pendentes, sincronizadas_hoje e última sincronização.",
+      "metaSortKey": -90
+    },
+
+    {
+      "_id": "req_demo_1_core_login",
+      "_type": "request",
+      "parentId": "fld_apresentacao",
+      "name": "🎬 1. Login Core (gestor)",
+      "method": "POST",
+      "url": "{{ _.core_url }}/token/",
+      "headers": [{ "name": "Content-Type", "value": "application/json" }],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"email\": \"{{ _.core_email }}\",\n  \"password\": \"{{ _.core_password }}\"\n}"
+      },
+      "authentication": {},
+      "metaSortKey": -1000
+    },
+    {
+      "_id": "req_demo_2_ms_login",
+      "_type": "request",
+      "parentId": "fld_apresentacao",
+      "name": "🎬 2. Login MS (coletor)",
+      "method": "POST",
+      "url": "{{ _.ms_url }}/auth/login",
+      "headers": [{ "name": "Content-Type", "value": "application/json" }],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"matricula\": \"{{ _.ms_matricula }}\",\n  \"senha\": \"{{ _.ms_senha }}\"\n}"
+      },
+      "authentication": {},
+      "metaSortKey": -900
+    },
+    {
+      "_id": "req_demo_3_core_create_property",
+      "_type": "request",
+      "parentId": "fld_apresentacao",
+      "name": "🎬 3. Core → criar imóvel (publica na fila imoveis)",
+      "method": "POST",
+      "url": "{{ _.core_url }}/program/properties",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {% response 'body', 'req_demo_1_core_login', 'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}" },
+        { "name": "Content-Type", "value": "application/json" }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"iptu\": \"999888777\",\n  \"logradouro\": \"Rua da Apresentação\",\n  \"numero\": \"123\",\n  \"bairro\": \"Centro\",\n  \"elegivel\": true\n}"
+      },
+      "authentication": {},
+      "metaSortKey": -800
+    },
+    {
+      "_id": "req_demo_4_ms_find_property",
+      "_type": "request",
+      "parentId": "fld_apresentacao",
+      "name": "🎬 4. MS → buscar imóvel propagado (id_externo do Core)",
+      "method": "GET",
+      "url": "{{ _.ms_url }}/imoveis/buscar?tipo=qrcode&valor=COLE_O_ID_GERADO_NO_CORE",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {% response 'body', 'req_demo_2_ms_login', 'b64::JC50b2tlbg==::46b', 'no-history', 60, 'never' %}" }
+      ],
+      "parameters": [
+        { "name": "tipo", "value": "qrcode" },
+        { "name": "valor", "value": "COLE_O_ID_GERADO_NO_CORE" }
+      ],
+      "body": {},
+      "authentication": {},
+      "description": "Substitua `COLE_O_ID_GERADO_NO_CORE` pelo id retornado no passo 3. O MS responde com o ObjectId do Mongo — anote para o passo 5.",
+      "metaSortKey": -700
+    },
+    {
+      "_id": "req_demo_5_ms_create_coleta",
+      "_type": "request",
+      "parentId": "fld_apresentacao",
+      "name": "🎬 5. MS → criar coleta (publica na fila coletas)",
+      "method": "POST",
+      "url": "{{ _.ms_url }}/coletas",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {% response 'body', 'req_demo_2_ms_login', 'b64::JC50b2tlbg==::46b', 'no-history', 60, 'never' %}" },
+        { "name": "Content-Type", "value": "application/json" }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"imovel_id\": \"COLE_O_OBJECTID_DO_PASSO_4\",\n  \"data_hora\": \"2026-05-19T10:00:00Z\",\n  \"materiais\": [\n    { \"tipo\": \"plastico\", \"peso_kg\": \"1.5\" },\n    { \"tipo\": \"papel\",    \"peso_kg\": \"1.0\" }\n  ],\n  \"gps\": { \"latitude\": -6.1086, \"longitude\": -38.2089 }\n}"
+      },
+      "authentication": {},
+      "metaSortKey": -600
+    },
+    {
+      "_id": "req_demo_6_ms_status",
+      "_type": "request",
+      "parentId": "fld_apresentacao",
+      "name": "🎬 6a. MS → status de sincronização",
+      "method": "GET",
+      "url": "{{ _.ms_url }}/sincronizacao/status",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {% response 'body', 'req_demo_2_ms_login', 'b64::JC50b2tlbg==::46b', 'no-history', 60, 'never' %}" }
+      ],
+      "body": {},
+      "authentication": {},
+      "metaSortKey": -500
+    },
+    {
+      "_id": "req_demo_7_core_benefit",
+      "_type": "request",
+      "parentId": "fld_apresentacao",
+      "name": "🎬 6b. Core → benefícios do imóvel",
+      "method": "GET",
+      "url": "{{ _.core_url }}/program/benefits/1",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {% response 'body', 'req_demo_1_core_login', 'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}" }
+      ],
+      "body": {},
+      "authentication": {},
+      "description": "Substitua `1` pelo id do imóvel criado no passo 3.",
+      "metaSortKey": -400
     }
   ]
 }

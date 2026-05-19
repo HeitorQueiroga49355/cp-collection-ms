@@ -9,7 +9,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import Coleta, Imovel, MaterialColeta, Rota, RotaImovel
+from .models import Coleta, Imovel, Rota, RotaImovel
 from .serializers import (
     ColetaDetailSerializer,
     ColetaHistoricoItemSerializer,
@@ -21,6 +21,8 @@ from .serializers import (
 )
 from .services.fila import publicar_coleta
 
+TAXA_PONTUACAO_POR_KG = Decimal('1.5')
+
 
 def _hoje():
     return timezone.localdate()
@@ -30,11 +32,6 @@ def _gerar_codigo():
     letras = ''.join(random.choices(string.ascii_uppercase, k=4))
     numeros = ''.join(random.choices(string.digits, k=4))
     return f"{letras}-{numeros}"
-
-
-def _calcular_pontos(materiais_data):
-    taxas = MaterialColeta.TAXA_PONTUACAO
-    return sum(Decimal(str(m['peso_kg'])) * Decimal(str(taxas.get(m['tipo'], 1.0))) for m in materiais_data)
 
 
 # ─── Rotas ────────────────────────────────────────────────────────────────────
@@ -122,15 +119,15 @@ class ImovelBuscarView(APIView):
     def get(self, request):
         tipo = request.query_params.get('tipo')
         valor = request.query_params.get('valor', '').strip()
-        rota_id = request.query_params.get('rota_id')
 
         if not tipo or not valor:
             return Response({'error': 'Parâmetros tipo e valor são obrigatórios'}, status=status.HTTP_400_BAD_REQUEST)
 
+        print(tipo, valor)
+
         qs = Imovel.objects.filter(ativo=True)
 
-        if rota_id:
-            qs = qs.filter(paradas__rota_id=rota_id)
+        print(qs.all())
 
         if tipo == 'numero':
             qs = qs.filter(iptu=valor)
@@ -189,9 +186,8 @@ class ColetaCreateView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        materiais_data = data['materiais']
-        peso_total = sum(Decimal(str(m['peso_kg'])) for m in materiais_data)
-        pontos = _calcular_pontos(materiais_data)
+        peso_total = Decimal(str(data['peso_total_kg']))
+        pontos = (peso_total * TAXA_PONTUACAO_POR_KG).quantize(Decimal('0.01'))
         gps = data.get('gps')
 
         with transaction.atomic():
@@ -210,13 +206,6 @@ class ColetaCreateView(APIView):
                 codigo=_gerar_codigo(),
                 sincronizado_core=False,
             )
-
-            for m in materiais_data:
-                MaterialColeta.objects.create(
-                    coleta=coleta,
-                    tipo=m['tipo'],
-                    peso_kg=m['peso_kg'],
-                )
 
             parada = RotaImovel.objects.filter(
                 rota__coletor=request.user,
@@ -252,7 +241,7 @@ class ColetaHistoricoView(APIView):
         limit = int(request.query_params.get('limit', 30))
 
         hoje = _hoje()
-        qs = Coleta.objects.filter(coletor=request.user).prefetch_related('materiais').select_related('imovel')
+        qs = Coleta.objects.filter(coletor=request.user).select_related('imovel')
 
         if data_param:
             qs = qs.filter(data_hora__date=data_param)
@@ -291,7 +280,7 @@ class ColetaDetailView(APIView):
 
     def get(self, request, pk):
         try:
-            coleta = Coleta.objects.select_related('imovel', 'coletor').prefetch_related('materiais').get(
+            coleta = Coleta.objects.select_related('imovel', 'coletor').get(
                 pk=pk, coletor=request.user
             )
         except Coleta.DoesNotExist:
@@ -310,13 +299,13 @@ class ColetaPendentesView(APIView):
                 'offline_id': str(c.offline_id) if c.offline_id else None,
                 'id': str(c.id),
                 'imovel_id': str(c.imovel_id),
-                'materiais': list(c.materiais.values('tipo', 'peso_kg')),
+                'peso_total_kg': str(c.peso_total_kg),
                 'data_hora': c.data_hora.isoformat(),
                 'sincronizado': c.sincronizado_core,
                 'tentativas_sincronizacao': c.tentativas_sincronizacao,
                 'erro_ultima_tentativa': c.erro_ultima_tentativa or None,
             }
-            for c in pendentes.prefetch_related('materiais')
+            for c in pendentes
         ]
         return Response({'pendentes': resultado, 'total': len(resultado)})
 
@@ -350,9 +339,8 @@ class SincronizarView(APIView):
                 if not imovel.elegivel:
                     raise ValueError('Imóvel não elegível para participar')
 
-                materiais_data = item.get('materiais', [])
-                peso_total = sum(Decimal(str(m['peso_kg'])) for m in materiais_data)
-                pontos = _calcular_pontos(materiais_data)
+                peso_total = Decimal(str(item['peso_total_kg']))
+                pontos = (peso_total * TAXA_PONTUACAO_POR_KG).quantize(Decimal('0.01'))
                 gps = item.get('gps')
 
                 with transaction.atomic():
@@ -370,8 +358,6 @@ class SincronizarView(APIView):
                         codigo=_gerar_codigo(),
                         sincronizado_core=False,
                     )
-                    for m in materiais_data:
-                        MaterialColeta.objects.create(coleta=coleta, tipo=m['tipo'], peso_kg=m['peso_kg'])
 
                 enviado = publicar_coleta(
                     coleta_id=str(coleta.id),

@@ -6,6 +6,7 @@ from django.db import models
 from .managers import ColetaManager, ImovelManager
 
 
+
 # ─── Imóvel ───────────────────────────────────────────────────────────────────
 
 class Imovel(models.Model):
@@ -187,40 +188,3 @@ class Coleta(models.Model):
     def __str__(self):
         return f"Coleta {self.coleta_id} — {self.coletor}"
 
-    def peso_por_categoria(self) -> dict:
-        return {m.tipo: m.peso_kg for m in self.materiais.all()}
-
-
-# ─── Material por Coleta ──────────────────────────────────────────────────────
-
-class MaterialColeta(models.Model):
-    class Tipo(models.TextChoices):
-        PLASTICO = 'plastico', 'Plástico'
-        PAPEL = 'papel', 'Papel'
-        VIDRO = 'vidro', 'Vidro'
-        METAL = 'metal', 'Metal'
-        ORGANICO = 'organico', 'Orgânico'
-
-    TAXA_PONTUACAO = {
-        'plastico': 1.5,
-        'papel': 2.0,
-        'vidro': 1.2,
-        'metal': 3.0,
-        'organico': 1.0,
-    }
-
-    coleta = models.ForeignKey(
-        Coleta,
-        on_delete=models.CASCADE,
-        related_name='materiais',
-        verbose_name='coleta',
-    )
-    tipo = models.CharField('tipo', max_length=20, choices=Tipo.choices)
-    peso_kg = models.DecimalField('peso (kg)', max_digits=8, decimal_places=3)
-
-    class Meta:
-        verbose_name = 'material da coleta'
-        verbose_name_plural = 'materiais da coleta'
-
-    def __str__(self):
-        return f"{self.get_tipo_display()} — {self.peso_kg}kg"

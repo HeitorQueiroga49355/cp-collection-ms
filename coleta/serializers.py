@@ -1,8 +1,6 @@
-from decimal import Decimal
-
 from rest_framework import serializers
 
-from .models import Coleta, Imovel, MaterialColeta, Rota, RotaImovel
+from .models import Coleta, Imovel, Rota, RotaImovel
 
 
 # ─── Imovel ───────────────────────────────────────────────────────────────────
@@ -44,7 +42,6 @@ class ImovelBuscarSerializer(serializers.ModelSerializer):
         return {
             'data': coleta.data_hora.date().isoformat(),
             'peso_kg': float(coleta.peso_total_kg),
-            'materiais': list(coleta.materiais.values_list('tipo', flat=True)),
         }
 
 
@@ -76,26 +73,12 @@ class ImovelDetailSerializer(serializers.ModelSerializer):
             {
                 'data': c.data_hora.date().isoformat(),
                 'peso_kg': float(c.peso_total_kg),
-                'materiais': list(c.materiais.values_list('tipo', flat=True)),
             }
             for c in obj.coletas.order_by('-data_hora')[:10]
         ]
 
     def get_total_coletas(self, obj):
         return obj.coletas.count()
-
-
-# ─── Material ─────────────────────────────────────────────────────────────────
-
-class MaterialColetaSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = MaterialColeta
-        fields = ['tipo', 'peso_kg']
-
-
-class MaterialColetaInputSerializer(serializers.Serializer):
-    tipo = serializers.ChoiceField(choices=MaterialColeta.Tipo.choices)
-    peso_kg = serializers.DecimalField(max_digits=8, decimal_places=3)
 
 
 # ─── GPS ──────────────────────────────────────────────────────────────────────
@@ -109,7 +92,7 @@ class GpsSerializer(serializers.Serializer):
 
 class ColetaInputSerializer(serializers.Serializer):
     imovel_id = serializers.CharField()
-    materiais = MaterialColetaInputSerializer(many=True)
+    peso_total_kg = serializers.DecimalField(max_digits=8, decimal_places=3)
     foto_url = serializers.URLField(required=False, allow_null=True, allow_blank=True)
     foto_base64 = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     gps = GpsSerializer(required=False, allow_null=True)
@@ -122,8 +105,6 @@ class ColetaOutputSerializer(serializers.ModelSerializer):
     id = serializers.CharField(read_only=True)
     imovel_id = serializers.CharField(source='imovel.id')
     coletor_id = serializers.CharField(source='coletor.id')
-    materiais = MaterialColetaSerializer(many=True)
-    taxa_pontuacao = serializers.SerializerMethodField()
     gps = serializers.SerializerMethodField()
     sincronizado = serializers.BooleanField(source='sincronizado_core')
 
@@ -131,12 +112,9 @@ class ColetaOutputSerializer(serializers.ModelSerializer):
         model = Coleta
         fields = [
             'id', 'codigo', 'imovel_id', 'coletor_id', 'status',
-            'data_hora', 'peso_total_kg', 'pontos_gerados', 'taxa_pontuacao',
-            'materiais', 'foto_url', 'gps', 'offline_id', 'sincronizado',
+            'data_hora', 'peso_total_kg', 'pontos_gerados',
+            'foto_url', 'gps', 'offline_id', 'sincronizado',
         ]
-
-    def get_taxa_pontuacao(self, obj):
-        return 1.5
 
     def get_gps(self, obj):
         if obj.gps_latitude is None:
@@ -147,7 +125,6 @@ class ColetaOutputSerializer(serializers.ModelSerializer):
 class ColetaHistoricoItemSerializer(serializers.ModelSerializer):
     id = serializers.CharField(read_only=True)
     imovel = ImovelResumoSerializer()
-    material_principal = serializers.SerializerMethodField()
     peso_kg = serializers.DecimalField(source='peso_total_kg', max_digits=8, decimal_places=1)
     pontos = serializers.DecimalField(source='pontos_gerados', max_digits=8, decimal_places=2)
     hora = serializers.SerializerMethodField()
@@ -156,13 +133,9 @@ class ColetaHistoricoItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = Coleta
         fields = [
-            'id', 'codigo', 'imovel', 'material_principal',
+            'id', 'codigo', 'imovel',
             'peso_kg', 'pontos', 'data_hora', 'hora', 'sincronizado',
         ]
-
-    def get_material_principal(self, obj):
-        mat = obj.materiais.order_by('-peso_kg').first()
-        return mat.tipo if mat else None
 
     def get_hora(self, obj):
         return obj.data_hora.strftime('%H:%M')
@@ -172,17 +145,15 @@ class ColetaDetailSerializer(serializers.ModelSerializer):
     id = serializers.CharField(read_only=True)
     imovel = serializers.SerializerMethodField()
     coletor = serializers.SerializerMethodField()
-    materiais = MaterialColetaSerializer(many=True)
     pontos = serializers.DecimalField(source='pontos_gerados', max_digits=8, decimal_places=2)
-    taxa_pontuacao_por_kg = serializers.SerializerMethodField()
     gps = serializers.SerializerMethodField()
     sincronizado = serializers.BooleanField(source='sincronizado_core')
 
     class Meta:
         model = Coleta
         fields = [
-            'id', 'codigo', 'imovel', 'coletor', 'materiais',
-            'peso_total_kg', 'pontos', 'taxa_pontuacao_por_kg',
+            'id', 'codigo', 'imovel', 'coletor',
+            'peso_total_kg', 'pontos',
             'data_hora', 'foto_url', 'gps', 'sincronizado', 'status',
         ]
 
@@ -201,9 +172,6 @@ class ColetaDetailSerializer(serializers.ModelSerializer):
             'nome': obj.coletor.nome or obj.coletor.username,
             'matricula': obj.coletor.username,
         }
-
-    def get_taxa_pontuacao_por_kg(self, obj):
-        return 1.5
 
     def get_gps(self, obj):
         if obj.gps_latitude is None:
