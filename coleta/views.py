@@ -20,8 +20,6 @@ from .serializers import (
 )
 from .services.fila import publicar_coleta
 
-TAXA_PONTUACAO_POR_KG = Decimal('1.5')
-
 
 def _hoje():
     return timezone.localdate()
@@ -110,7 +108,6 @@ class ColetaCreateView(APIView):
             )
 
         peso_total = Decimal(str(data['peso_total_kg']))
-        pontos = (peso_total * TAXA_PONTUACAO_POR_KG).quantize(Decimal('0.01'))
         gps = data.get('gps')
 
         with transaction.atomic():
@@ -119,7 +116,6 @@ class ColetaCreateView(APIView):
                 imovel=imovel,
                 data_hora=data['data_hora'],
                 peso_total_kg=peso_total,
-                pontos_gerados=pontos,
                 foto_url=data.get('foto_url') or '',
                 gps_latitude=gps['latitude'] if gps else None,
                 gps_longitude=gps['longitude'] if gps else None,
@@ -133,7 +129,6 @@ class ColetaCreateView(APIView):
         enviado = publicar_coleta(
             coleta_id=str(coleta.id),
             inscricao_imobiliaria=coleta.imovel.id_externo,
-            pontuacao=str(coleta.pontos_gerados),
             peso_total_kg=str(coleta.peso_total_kg),
             data_hora=coleta.data_hora.isoformat(),
         )
@@ -172,7 +167,6 @@ class ColetaHistoricoView(APIView):
 
         total_coletas = qs.count()
         total_kg = sum(c.peso_total_kg for c in qs)
-        total_pontos = sum(c.pontos_gerados for c in qs)
 
         offset = (page - 1) * limit
         coletas_pagina = qs[offset:offset + limit]
@@ -182,7 +176,6 @@ class ColetaHistoricoView(APIView):
             'resumo': {
                 'total_coletas': total_coletas,
                 'total_kg': float(total_kg),
-                'total_pontos': float(total_pontos),
             },
             'page': page,
             'total_pages': max(1, -(-total_coletas // limit)),
@@ -254,7 +247,6 @@ class SincronizarView(APIView):
                     raise ValueError('Imóvel não elegível para participar')
 
                 peso_total = Decimal(str(item['peso_total_kg']))
-                pontos = (peso_total * TAXA_PONTUACAO_POR_KG).quantize(Decimal('0.01'))
                 gps = item.get('gps')
 
                 with transaction.atomic():
@@ -263,7 +255,6 @@ class SincronizarView(APIView):
                         imovel=imovel,
                         data_hora=item['data_hora'],
                         peso_total_kg=peso_total,
-                        pontos_gerados=pontos,
                         foto_url=item.get('foto_url') or '',
                         gps_latitude=gps['latitude'] if gps else None,
                         gps_longitude=gps['longitude'] if gps else None,
@@ -276,7 +267,6 @@ class SincronizarView(APIView):
                 enviado = publicar_coleta(
                     coleta_id=str(coleta.id),
                     inscricao_imobiliaria=coleta.imovel.id_externo,
-                    pontuacao=str(coleta.pontos_gerados),
                     peso_total_kg=str(coleta.peso_total_kg),
                     data_hora=coleta.data_hora.isoformat(),
                 )

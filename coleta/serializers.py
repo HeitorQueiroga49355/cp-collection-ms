@@ -112,7 +112,7 @@ class ColetaOutputSerializer(serializers.ModelSerializer):
         model = Coleta
         fields = [
             'id', 'codigo', 'imovel_id', 'coletor_id', 'status',
-            'data_hora', 'peso_total_kg', 'pontos_gerados',
+            'data_hora', 'peso_total_kg',
             'foto_url', 'gps', 'offline_id', 'sincronizado',
         ]
 
@@ -126,7 +126,6 @@ class ColetaHistoricoItemSerializer(serializers.ModelSerializer):
     id = serializers.CharField(read_only=True)
     imovel = ImovelResumoSerializer()
     peso_kg = serializers.DecimalField(source='peso_total_kg', max_digits=8, decimal_places=1)
-    pontos = serializers.DecimalField(source='pontos_gerados', max_digits=8, decimal_places=2)
     hora = serializers.SerializerMethodField()
     sincronizado = serializers.BooleanField(source='sincronizado_core')
 
@@ -134,7 +133,7 @@ class ColetaHistoricoItemSerializer(serializers.ModelSerializer):
         model = Coleta
         fields = [
             'id', 'codigo', 'imovel',
-            'peso_kg', 'pontos', 'data_hora', 'hora', 'sincronizado',
+            'peso_kg', 'data_hora', 'hora', 'sincronizado',
         ]
 
     def get_hora(self, obj):
@@ -145,7 +144,6 @@ class ColetaDetailSerializer(serializers.ModelSerializer):
     id = serializers.CharField(read_only=True)
     imovel = serializers.SerializerMethodField()
     coletor = serializers.SerializerMethodField()
-    pontos = serializers.DecimalField(source='pontos_gerados', max_digits=8, decimal_places=2)
     gps = serializers.SerializerMethodField()
     sincronizado = serializers.BooleanField(source='sincronizado_core')
 
@@ -153,7 +151,7 @@ class ColetaDetailSerializer(serializers.ModelSerializer):
         model = Coleta
         fields = [
             'id', 'codigo', 'imovel', 'coletor',
-            'peso_total_kg', 'pontos',
+            'peso_total_kg',
             'data_hora', 'foto_url', 'gps', 'sincronizado', 'status',
         ]
 

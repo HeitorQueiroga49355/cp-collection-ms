@@ -77,7 +77,6 @@ class Coleta(models.Model):
     )
     data_hora = models.DateTimeField('data e hora')
     peso_total_kg = models.DecimalField('peso total (kg)', max_digits=8, decimal_places=3)
-    pontos_gerados = models.DecimalField('pontos gerados', max_digits=8, decimal_places=2, default=0)
     foto_url = models.URLField('foto', blank=True)
     gps_latitude = models.FloatField('latitude', null=True, blank=True)
     gps_longitude = models.FloatField('longitude', null=True, blank=True)
