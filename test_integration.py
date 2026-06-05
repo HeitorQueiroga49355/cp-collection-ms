@@ -488,7 +488,6 @@ def t_ms_create_coleta():
         "data_hora":  datetime.now(timezone.utc).isoformat(),
         "materiais":  CFG["coleta_payload"]["materiais"],
         "foto_url":   CFG["coleta_payload"]["foto_url"],
-        "gps":        CFG["coleta_payload"]["gps"],
         "observacoes":CFG["coleta_payload"]["observacoes"],
         "offline_id": str(uuid.uuid4()),
     }

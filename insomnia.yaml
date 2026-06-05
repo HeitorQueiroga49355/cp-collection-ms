@@ -63,7 +63,9 @@ collection:
             	"titular": 2,
             	"cep": "95900-000",
             	"cidade": "Pau dos Ferros",
-            	"estado": "RN"
+            	"estado": "RN",
+            	"latitude": -6.108600,
+            	"longitude": -38.208900
             }
         headers:
           - name: Authorization
@@ -174,8 +176,7 @@ collection:
             {
               "imovel_id": "6a0cef7bc909ca41a75322b8",
               "data_hora": "2026-05-19T10:00:00Z",
-              "peso_total_kg": "2.5",
-              "gps": { "latitude": -6.1086, "longitude": -38.2089 }
+              "peso_total_kg": "2.5"
             }
         headers:
           - name: Authorization
@@ -463,7 +464,9 @@ collection:
                   "logradouro": "Rua da Apresentação",
                   "numero": "123",
                   "bairro": "Centro",
-                  "elegivel": true
+                  "elegivel": true,
+                  "latitude": -6.108600,
+                  "longitude": -38.208900
                 }
             headers:
               - name: Authorization
@@ -1645,10 +1648,6 @@ collection:
                   "imovel_id": "SUBSTITUA_OBJECTID_DO_IMOVEL",
                   "data_hora": "2026-05-19T10:00:00Z",
                   "peso_total_kg": "2.5",
-                  "gps": {
-                    "latitude": -6.1086,
-                    "longitude": -38.2089
-                  },
                   "foto_url": null,
                   "observacoes": "",
                   "offline_id": null
@@ -1769,7 +1768,6 @@ collection:
                       "imovel_id": "SUBSTITUA_OBJECTID_DO_IMOVEL",
                       "data_hora": "2026-05-19T07:15:00-03:00",
                       "peso_total_kg": "4.8",
-                      "gps": { "latitude": -6.1086, "longitude": -38.2089 },
                       "foto_url": null
                     }
                   ]

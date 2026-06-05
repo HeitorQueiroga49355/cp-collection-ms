@@ -108,7 +108,6 @@ class ColetaCreateView(APIView):
             )
 
         peso_total = Decimal(str(data['peso_total_kg']))
-        gps = data.get('gps')
 
         with transaction.atomic():
             coleta = Coleta.objects.create(
@@ -117,8 +116,6 @@ class ColetaCreateView(APIView):
                 data_hora=data['data_hora'],
                 peso_total_kg=peso_total,
                 foto_url=data.get('foto_url') or '',
-                gps_latitude=gps['latitude'] if gps else None,
-                gps_longitude=gps['longitude'] if gps else None,
                 status=Coleta.Status.CONFIRMADA,
                 observacoes=data.get('observacoes') or '',
                 offline_id=offline_id,
@@ -247,7 +244,6 @@ class SincronizarView(APIView):
                     raise ValueError('Imóvel não elegível para participar')
 
                 peso_total = Decimal(str(item['peso_total_kg']))
-                gps = item.get('gps')
 
                 with transaction.atomic():
                     coleta = Coleta.objects.create(
@@ -256,8 +252,6 @@ class SincronizarView(APIView):
                         data_hora=item['data_hora'],
                         peso_total_kg=peso_total,
                         foto_url=item.get('foto_url') or '',
-                        gps_latitude=gps['latitude'] if gps else None,
-                        gps_longitude=gps['longitude'] if gps else None,
                         status=Coleta.Status.CONFIRMADA,
                         offline_id=offline_id,
                         codigo=_gerar_codigo(),
