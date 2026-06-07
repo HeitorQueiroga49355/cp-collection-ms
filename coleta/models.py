@@ -20,8 +20,7 @@ class Imovel(models.Model):
     telefone = models.CharField('telefone', max_length=20, blank=True)
     elegivel = models.BooleanField('elegível', default=True)
     motivo_inelegivel = models.TextField('motivo inelegível', blank=True)
-    latitude = models.DecimalField('latitude', max_digits=9, decimal_places=6, null=True, blank=True)
-    longitude = models.DecimalField('longitude', max_digits=9, decimal_places=6, null=True, blank=True)
+    location = models.JSONField('localização (GeoJSON)', null=True, blank=True)
     sincronizado_em = models.DateTimeField('sincronizado em', auto_now=True)
     ativo = models.BooleanField('ativo', default=True)
 
@@ -42,6 +41,15 @@ class Imovel(models.Model):
     @property
     def endereco(self):
         return f"{self.logradouro}, {self.numero}"
+
+    @staticmethod
+    def montar_location(latitude, longitude):
+        """Monta um Point GeoJSON ({type, coordinates: [lng, lat]}) a partir de
+        latitude/longitude. Retorna None quando alguma coordenada está ausente
+        (imóveis sem geocodificação)."""
+        if latitude is None or longitude is None:
+            return None
+        return {'type': 'Point', 'coordinates': [float(longitude), float(latitude)]}
 
 
 # ─── Coleta ───────────────────────────────────────────────────────────────────
