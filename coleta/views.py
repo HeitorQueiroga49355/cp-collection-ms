@@ -19,6 +19,7 @@ from .serializers import (
     ImovelDetailSerializer,
 )
 from .services.fila import publicar_coleta
+from .services.storage import upload_foto_coleta
 
 
 def _hoje():
@@ -67,6 +68,9 @@ class ImovelBuscarView(APIView):
             qs = qs.filter(id=valor)
         elif tipo == 'endereco':
             qs = qs.filter(logradouro__icontains=valor)
+            limit = min(int(request.query_params.get('limit', 20)), 100)
+            imoveis = qs[:limit]
+            return Response({'imoveis': ImovelBuscarSerializer(imoveis, many=True).data, 'total': len(imoveis)})
         else:
             return Response({'error': 'Tipo de busca inválido'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -194,6 +198,14 @@ class ColetaCreateView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        foto_url = ''
+        arquivo = request.FILES.get('foto')
+        if arquivo:
+            try:
+                foto_url = upload_foto_coleta(arquivo, content_type=arquivo.content_type or 'image/jpeg')
+            except Exception as exc:
+                return Response({'error': f'Falha ao enviar foto: {exc}'}, status=status.HTTP_502_BAD_GATEWAY)
+
         peso_total = Decimal(str(data['peso_total_kg']))
 
         with transaction.atomic():
@@ -202,7 +214,7 @@ class ColetaCreateView(APIView):
                 imovel=imovel,
                 data_hora=data['data_hora'],
                 peso_total_kg=peso_total,
-                foto_url=data.get('foto_url') or '',
+                foto_url=foto_url,
                 status=Coleta.Status.CONFIRMADA,
                 observacoes=data.get('observacoes') or '',
                 offline_id=offline_id,

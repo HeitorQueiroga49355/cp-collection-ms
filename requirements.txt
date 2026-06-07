@@ -12,3 +12,4 @@ pymongo==4.17.0
 python-dotenv==1.2.2
 sqlparse==0.5.5
 pytz
+minio

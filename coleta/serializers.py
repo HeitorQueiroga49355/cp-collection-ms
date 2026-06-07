@@ -87,8 +87,6 @@ class ImovelDetailSerializer(serializers.ModelSerializer):
 class ColetaInputSerializer(serializers.Serializer):
     imovel_id = serializers.CharField()
     peso_total_kg = serializers.DecimalField(max_digits=8, decimal_places=3)
-    foto_url = serializers.URLField(required=False, allow_null=True, allow_blank=True)
-    foto_base64 = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     data_hora = serializers.DateTimeField()
     observacoes = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     offline_id = serializers.UUIDField(required=False, allow_null=True)
@@ -138,7 +136,7 @@ class ColetaDetailSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'codigo', 'imovel', 'coletor',
             'peso_total_kg',
-            'data_hora', 'foto_url', 'sincronizado', 'status',
+            'data_hora', 'foto_url', 'sincronizado', 'status', 'observacoes',
         ]
 
     def get_imovel(self, obj):
