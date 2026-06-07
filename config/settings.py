@@ -73,7 +73,7 @@ DATABASES = {
         'NAME': os.getenv('MONGO_INITDB_DATABASE', 'coleta_db'),
         'ENFORCE_SCHEMA': False,
         'HOST': os.getenv('MONGO_HOST', 'localhost'),
-        'PORT': 27017,
+        'PORT': int(os.getenv('MONGO_PORT', 27017)),
         'USER': os.getenv('MONGO_USER'),
         'PASSWORD': os.getenv('MONGO_PASSWORD'),
         'CLIENT': {

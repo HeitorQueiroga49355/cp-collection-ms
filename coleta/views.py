@@ -2,7 +2,7 @@ import random
 import string
 from decimal import Decimal
 
-from django.db import transaction
+from django.db import connections, transaction
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
@@ -29,6 +29,17 @@ def _gerar_codigo():
     letras = ''.join(random.choices(string.ascii_uppercase, k=4))
     numeros = ''.join(random.choices(string.digits, k=4))
     return f"{letras}-{numeros}"
+
+
+def _distancia_metros(lng1, lat1, coords):
+    """Distância em metros entre (lng1, lat1) e um ponto GeoJSON [lng, lat]."""
+    from math import asin, cos, radians, sin, sqrt
+
+    lng2, lat2 = coords[0], coords[1]
+    dlat = radians(lat2 - lat1)
+    dlng = radians(lng2 - lng1)
+    a = sin(dlat / 2) ** 2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlng / 2) ** 2
+    return 2 * 6371000 * asin(sqrt(a))
 
 
 
@@ -76,6 +87,82 @@ class ImovelDetailView(APIView):
             return Response({'error': 'Imóvel não encontrado'}, status=status.HTTP_404_NOT_FOUND)
 
         return Response(ImovelDetailSerializer(imovel).data)
+
+
+class ImovelProximosView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        lat = request.query_params.get('lat')
+        lng = request.query_params.get('lng')
+        raio = request.query_params.get('raio', 200)
+
+        if lat is None or lng is None:
+            return Response({'error': 'Parâmetros lat e lng são obrigatórios'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            lat = float(lat)
+            lng = float(lng)
+            raio = float(raio)
+        except (TypeError, ValueError):
+            return Response({'error': 'Parâmetros lat, lng e raio devem ser numéricos'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Filtro com $near: retorna apenas imóveis ativos dentro do raio (em metros),
+        # já ordenados do mais próximo ao mais distante. Imóveis sem coordenadas são
+        # excluídos automaticamente (não constam no índice 2dsphere).
+        filtro = {
+            'ativo': True,
+            'location': {
+                '$near': {
+                    '$geometry': {'type': 'Point', 'coordinates': [lng, lat]},
+                    '$maxDistance': raio,
+                }
+            },
+        }
+
+        colecao = connections['default'].get_collection(Imovel._meta.db_table)
+        documentos = list(colecao.find(filtro))
+
+        print(documentos)
+        # $near não devolve a distância; calcula-se manualmente (haversine, em metros).
+        for doc in documentos:
+            coords = (doc.get('location') or {}).get('coordinates')
+            doc['distancia'] = _distancia_metros(lng, lat, coords) if coords else 0.0
+
+
+        # __date (TruncDate) não é suportado pelo backend MongoDB; filtra-se por
+        # intervalo do dia local, mesmo recurso usado em SincronizacaoStatusView.
+        from datetime import datetime, time
+        hoje = _hoje()
+        inicio_hoje = timezone.make_aware(datetime.combine(hoje, time.min))
+        fim_hoje = timezone.make_aware(datetime.combine(hoje, time.max))
+
+        ids = [doc['_id'] for doc in documentos]
+        coletados_hoje = set(
+            Coleta.objects.filter(
+                coletor=request.user,
+                imovel_id__in=ids,
+                data_hora__gte=inicio_hoje,
+                data_hora__lte=fim_hoje,
+            ).values_list('imovel_id', flat=True)
+        )
+
+        imoveis = [
+            {
+                'id': str(doc['_id']),
+                'id_externo': doc.get('id_externo'),
+                'logradouro': doc.get('logradouro'),
+                'numero': doc.get('numero'),
+                'bairro': doc.get('bairro'),
+                'complemento': doc.get('complemento') or '',
+                'elegivel': doc.get('elegivel', True),
+                'distancia': round(doc['distancia'], 1),
+                'coletado_hoje': doc['_id'] in coletados_hoje,
+            }
+            for doc in documentos
+        ]
+
+        return Response({'imoveis': imoveis, 'total': len(imoveis)})
 
 
 # ─── Coletas ──────────────────────────────────────────────────────────────────

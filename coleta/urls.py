@@ -7,12 +7,14 @@ from .views import (
     ColetaPendentesView,
     ImovelBuscarView,
     ImovelDetailView,
+    ImovelProximosView,
     SincronizacaoStatusView,
     SincronizarView,
 )
 
 urlpatterns = [
     path('imoveis/buscar', ImovelBuscarView.as_view(), name='imovel-buscar'),
+    path('imoveis/proximos', ImovelProximosView.as_view(), name='imovel-proximos'),
     path('imoveis/<str:pk>', ImovelDetailView.as_view(), name='imovel-detail'),
 
     path('coletas/historico', ColetaHistoricoView.as_view(), name='coleta-historico'),

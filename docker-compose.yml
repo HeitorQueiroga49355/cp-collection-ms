@@ -9,7 +9,9 @@ services:
       MONGO_INITDB_ROOT_PASSWORD: senha123
       MONGO_INITDB_DATABASE: coleta_db
     ports:
-      - "27017:27017"
+      # Host 27018 para não conflitar com um MongoDB nativo na 27017.
+      # Dentro da rede docker o app continua acessando via mongodb:27017.
+      - "27018:27017"
     volumes:
       - mongodb_data:/data/db
     networks:
