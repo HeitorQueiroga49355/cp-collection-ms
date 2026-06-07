@@ -16,6 +16,8 @@ class ImovelManager(models.Manager):
             'telefone': payload.get('telefone', ''),
             'elegivel': payload.get('elegivel', True),
             'motivo_inelegivel': payload.get('motivo_inelegivel', ''),
+            'latitude': payload.get('latitude'),
+            'longitude': payload.get('longitude'),
             'ativo': payload.get('ativo', True),
         }
         return self.update_or_create(id_externo=inscricao, defaults=defaults)

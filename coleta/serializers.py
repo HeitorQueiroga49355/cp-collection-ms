@@ -29,7 +29,8 @@ class ImovelBuscarSerializer(serializers.ModelSerializer):
         model = Imovel
         fields = [
             'id', 'numero_iptu', 'endereco', 'numero_endereco',
-            'bairro', 'morador', 'elegivel', 'ultimo_coleta',
+            'bairro', 'morador', 'elegivel', 'latitude', 'longitude',
+            'ultimo_coleta',
         ]
 
     def get_endereco(self, obj):
@@ -59,7 +60,7 @@ class ImovelDetailSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'numero_iptu', 'endereco', 'numero_endereco', 'bairro',
             'complemento', 'morador', 'telefone', 'elegivel', 'motivo_inelegivel',
-            'historico_coletas', 'total_coletas',
+            'latitude', 'longitude', 'historico_coletas', 'total_coletas',
         ]
 
     def get_endereco(self, obj):

@@ -20,6 +20,8 @@ class Imovel(models.Model):
     telefone = models.CharField('telefone', max_length=20, blank=True)
     elegivel = models.BooleanField('elegível', default=True)
     motivo_inelegivel = models.TextField('motivo inelegível', blank=True)
+    latitude = models.DecimalField('latitude', max_digits=9, decimal_places=6, null=True, blank=True)
+    longitude = models.DecimalField('longitude', max_digits=9, decimal_places=6, null=True, blank=True)
     sincronizado_em = models.DateTimeField('sincronizado em', auto_now=True)
     ativo = models.BooleanField('ativo', default=True)
 
