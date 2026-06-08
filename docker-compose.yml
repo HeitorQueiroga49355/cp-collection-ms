@@ -33,42 +33,17 @@ services:
     environment:
       MONGO_HOST: mongodb
       RABBITMQ_HOST: rabbitmq   # container do Coleta-Premiada via rede compartilhada
+      MINIO_ENDPOINT: minio:9000
     ports:
       - "8002:8001"
     depends_on:
       mongodb:
         condition: service_healthy
-      minio:
-        condition: service_healthy
-    environment:
-      MINIO_ENDPOINT: minio:9000
     volumes:
       - .:/app
     networks:
       - coleta-ms-network
       - coleta-shared  # acessa o rabbitmq do Coleta-Premiada
-
-  # MinIO - Armazenamento de objetos (fotos de coleta)
-  minio:
-    image: minio/minio:latest
-    container_name: coleta-minio
-    restart: unless-stopped
-    environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
-    command: server /data --console-address ":9001"
-    ports:
-      - "9000:9000"
-      - "9001:9001"
-    volumes:
-      - minio_data:/data
-    networks:
-      - coleta-ms-network
-    healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
 
   # Consumer da fila 'imoveis' (publicada pelo Coleta-Premiada Core)
   coleta-ms-consumer:
@@ -93,8 +68,6 @@ services:
 
 volumes:
   mongodb_data:
-    driver: local
-  minio_data:
     driver: local
 
 networks:

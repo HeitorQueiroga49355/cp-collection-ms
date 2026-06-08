@@ -162,6 +162,7 @@ class ImovelProximosView(APIView):
                 'elegivel': doc.get('elegivel', True),
                 'distancia': round(doc['distancia'], 1),
                 'coletado_hoje': doc['_id'] in coletados_hoje,
+                'location': doc.get('location'),
             }
             for doc in documentos
         ]
