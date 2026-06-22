@@ -72,7 +72,10 @@ services:
     volumes:
       - .:/app
     networks:
-      - ms-local-network
+      ms-local-network: {}
+      coleta-observability:
+        aliases:
+          - ms-dev
 
   ms-consumer:
     build:
@@ -95,9 +98,34 @@ services:
     networks:
       - ms-local-network
 
+  mongodb-exporter:
+    image: percona/mongodb_exporter:0.40
+    restart: unless-stopped
+    environment:
+      MONGODB_URI: "mongodb://${MONGO_USER}:${MONGO_PASSWORD}@ms-db:27017/?authSource=admin"
+    depends_on:
+      ms-db:
+        condition: service_healthy
+    networks:
+      ms-local-network: {}
+      coleta-observability:
+        aliases:
+          - mongodb-exporter
+    deploy:
+      resources:
+        limits:
+          cpus: "0.1"
+          memory: 64M
+        reservations:
+          cpus: "0.05"
+          memory: 32M
+
 volumes:
   ms-db-data:
 
 networks:
   ms-local-network:
     driver: bridge
+  coleta-observability:
+    external: true
+    name: coleta-observability
