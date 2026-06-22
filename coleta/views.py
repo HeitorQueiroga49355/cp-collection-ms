@@ -26,6 +26,16 @@ def _hoje():
     return timezone.localdate()
 
 
+def _dia_range(date):
+    """Return (start, end) as UTC-aware datetimes spanning the given local date."""
+    from datetime import datetime, time
+    import pytz
+    tz = pytz.timezone('America/Fortaleza')
+    start = tz.localize(datetime.combine(date, time.min))
+    end = tz.localize(datetime.combine(date, time.max))
+    return start, end
+
+
 def _gerar_codigo():
     letras = ''.join(random.choices(string.ascii_uppercase, k=4))
     numeros = ''.join(random.choices(string.digits, k=4))
@@ -250,17 +260,30 @@ class ColetaHistoricoView(APIView):
         qs = Coleta.objects.filter(coletor=request.user).select_related('imovel')
 
         if data_param:
-            qs = qs.filter(data_hora__date=data_param)
+            from datetime import date as date_type
+            parsed = date_type.fromisoformat(data_param)
+            start, end = _dia_range(parsed)
+            qs = qs.filter(data_hora__gte=start, data_hora__lte=end)
         elif tipo_periodo == 'hoje':
-            qs = qs.filter(data_hora__date=hoje)
+            start, end = _dia_range(hoje)
+            qs = qs.filter(data_hora__gte=start, data_hora__lte=end)
         elif tipo_periodo == 'ontem':
             from datetime import timedelta
-            qs = qs.filter(data_hora__date=hoje - timedelta(days=1))
+            start, end = _dia_range(hoje - timedelta(days=1))
+            qs = qs.filter(data_hora__gte=start, data_hora__lte=end)
         elif tipo_periodo == 'semana':
             from datetime import timedelta
-            qs = qs.filter(data_hora__date__gte=hoje - timedelta(days=7))
+            start, _ = _dia_range(hoje - timedelta(days=7))
+            _, end = _dia_range(hoje)
+            qs = qs.filter(data_hora__gte=start, data_hora__lte=end)
         elif tipo_periodo == 'mes':
-            qs = qs.filter(data_hora__year=hoje.year, data_hora__month=hoje.month)
+            import calendar
+            from datetime import date as date_type
+            first_day = date_type(hoje.year, hoje.month, 1)
+            last_day = date_type(hoje.year, hoje.month, calendar.monthrange(hoje.year, hoje.month)[1])
+            start, _ = _dia_range(first_day)
+            _, end = _dia_range(last_day)
+            qs = qs.filter(data_hora__gte=start, data_hora__lte=end)
 
         total_coletas = qs.count()
         total_kg = sum(c.peso_total_kg for c in qs)
