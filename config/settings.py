@@ -10,6 +10,7 @@ DEBUG = os.getenv('DEBUG', 'False') == 'True'
 ALLOWED_HOSTS = ['*']
 
 INSTALLED_APPS = [
+    'django_prometheus',
     'config.apps.MongoAdminConfig',
     'config.apps.MongoAuthConfig',
     'config.apps.MongoContentTypesConfig',
@@ -42,6 +43,7 @@ SIMPLE_JWT = {
 CORS_ALLOW_ALL_ORIGINS = DEBUG  # em produção defina CORS_ALLOWED_ORIGINS explicitamente
 
 MIDDLEWARE = [
+    'django_prometheus.middleware.PrometheusBeforeMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -50,6 +52,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'django_prometheus.middleware.PrometheusAfterMiddleware',
 ]
 
 ROOT_URLCONF = 'config.urls'
