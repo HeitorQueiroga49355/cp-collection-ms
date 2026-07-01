@@ -2,10 +2,12 @@ import random
 import string
 from decimal import Decimal
 
+import jwt as pyjwt
+from django.conf import settings
 from django.db import connections, transaction
 from django.utils import timezone
 from rest_framework import status
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -20,6 +22,24 @@ from .serializers import (
 )
 from .services.fila import publicar_coleta
 from .services.storage import upload_foto_coleta
+
+
+def _decode_core_jwt(request):
+    auth_header = request.headers.get('Authorization', '')
+    if not auth_header.startswith('Bearer '):
+        return None, 'Token JWT ausente ou mal formatado'
+    token = auth_header[7:]
+    try:
+        payload = pyjwt.decode(
+            token,
+            settings.CORE_JWT_SECRET_KEY,
+            algorithms=['HS256'],
+        )
+        return payload, None
+    except pyjwt.ExpiredSignatureError:
+        return None, 'Token expirado'
+    except pyjwt.InvalidTokenError as exc:
+        return None, f'Token inválido: {exc}'
 
 
 def _hoje():
@@ -335,6 +355,52 @@ class ColetaPendentesView(APIView):
             for c in pendentes
         ]
         return Response({'pendentes': resultado, 'total': len(resultado)})
+
+
+# ─── Portal do Morador ────────────────────────────────────────────────────────
+
+class ColetasMoradorView(APIView):
+    """
+    GET /coletas/morador — retorna as coletas dos imóveis do morador autenticado
+    via JWT do core (validado com CORE_JWT_SECRET_KEY), paginadas e ordenadas
+    decrescentemente pela data de criação.
+    """
+    # A autenticação JWT global (JWTAuthentication) valida tokens do próprio
+    # microsserviço contra o modelo Coletor — rodaria antes do permission_classes
+    # e derrubaria com 401 qualquer token do core (assinado para o Usuario/morador).
+    # A validação do token do core é feita manualmente em _decode_core_jwt.
+    authentication_classes = []
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        payload, erro = _decode_core_jwt(request)
+        if erro:
+            return Response({'error': erro}, status=status.HTTP_401_UNAUTHORIZED)
+
+        user_id = payload.get('user_id')
+        if not user_id:
+            return Response({'error': 'Token sem user_id'}, status=status.HTTP_401_UNAUTHORIZED)
+
+        page = max(1, int(request.query_params.get('page', 1)))
+        limit = min(max(1, int(request.query_params.get('limit', 20))), 100)
+
+        qs = (
+            Coleta.objects
+            .filter(imovel__proprietario_id=user_id)
+            .select_related('imovel')
+            .order_by('-criado_em')
+        )
+
+        total = qs.count()
+        offset = (page - 1) * limit
+        coletas_pagina = qs[offset:offset + limit]
+
+        return Response({
+            'coletas': ColetaHistoricoItemSerializer(coletas_pagina, many=True).data,
+            'page': page,
+            'total': total,
+            'total_pages': max(1, -(-total // limit)),
+        })
 
 
 # ─── Sincronização ────────────────────────────────────────────────────────────

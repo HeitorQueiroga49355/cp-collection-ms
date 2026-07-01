@@ -6,6 +6,8 @@ load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'chave-local-insegura')
+# Chave usada pelo core para assinar JWTs — deve ser igual ao DJANGO_SECRET_KEY do core em produção.
+CORE_JWT_SECRET_KEY = os.getenv('CORE_JWT_SECRET_KEY', 'chave-local-insegura')
 DEBUG = os.getenv('DEBUG', 'False') == 'True'
 ALLOWED_HOSTS = ['*']
 
