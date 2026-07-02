@@ -29,7 +29,8 @@ class ImovelBuscarSerializer(serializers.ModelSerializer):
         model = Imovel
         fields = [
             'id', 'numero_iptu', 'endereco', 'numero_endereco',
-            'bairro', 'morador', 'elegivel', 'ultimo_coleta',
+            'bairro', 'morador', 'elegivel', 'location',
+            'ultimo_coleta',
         ]
 
     def get_endereco(self, obj):
@@ -59,7 +60,7 @@ class ImovelDetailSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'numero_iptu', 'endereco', 'numero_endereco', 'bairro',
             'complemento', 'morador', 'telefone', 'elegivel', 'motivo_inelegivel',
-            'historico_coletas', 'total_coletas',
+            'location', 'historico_coletas', 'total_coletas',
         ]
 
     def get_endereco(self, obj):
@@ -81,21 +82,11 @@ class ImovelDetailSerializer(serializers.ModelSerializer):
         return obj.coletas.count()
 
 
-# ─── GPS ──────────────────────────────────────────────────────────────────────
-
-class GpsSerializer(serializers.Serializer):
-    latitude = serializers.FloatField()
-    longitude = serializers.FloatField()
-
-
 # ─── Coleta ───────────────────────────────────────────────────────────────────
 
 class ColetaInputSerializer(serializers.Serializer):
     imovel_id = serializers.CharField()
     peso_total_kg = serializers.DecimalField(max_digits=8, decimal_places=3)
-    foto_url = serializers.URLField(required=False, allow_null=True, allow_blank=True)
-    foto_base64 = serializers.CharField(required=False, allow_null=True, allow_blank=True)
-    gps = GpsSerializer(required=False, allow_null=True)
     data_hora = serializers.DateTimeField()
     observacoes = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     offline_id = serializers.UUIDField(required=False, allow_null=True)
@@ -105,7 +96,6 @@ class ColetaOutputSerializer(serializers.ModelSerializer):
     id = serializers.CharField(read_only=True)
     imovel_id = serializers.CharField(source='imovel.id')
     coletor_id = serializers.CharField(source='coletor.id')
-    gps = serializers.SerializerMethodField()
     sincronizado = serializers.BooleanField(source='sincronizado_core')
 
     class Meta:
@@ -113,13 +103,8 @@ class ColetaOutputSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'codigo', 'imovel_id', 'coletor_id', 'status',
             'data_hora', 'peso_total_kg',
-            'foto_url', 'gps', 'offline_id', 'sincronizado',
+            'foto_url', 'offline_id', 'sincronizado',
         ]
-
-    def get_gps(self, obj):
-        if obj.gps_latitude is None:
-            return None
-        return {'latitude': obj.gps_latitude, 'longitude': obj.gps_longitude}
 
 
 class ColetaHistoricoItemSerializer(serializers.ModelSerializer):
@@ -144,7 +129,6 @@ class ColetaDetailSerializer(serializers.ModelSerializer):
     id = serializers.CharField(read_only=True)
     imovel = serializers.SerializerMethodField()
     coletor = serializers.SerializerMethodField()
-    gps = serializers.SerializerMethodField()
     sincronizado = serializers.BooleanField(source='sincronizado_core')
 
     class Meta:
@@ -152,7 +136,7 @@ class ColetaDetailSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'codigo', 'imovel', 'coletor',
             'peso_total_kg',
-            'data_hora', 'foto_url', 'gps', 'sincronizado', 'status',
+            'data_hora', 'foto_url', 'sincronizado', 'status', 'observacoes',
         ]
 
     def get_imovel(self, obj):
@@ -170,10 +154,5 @@ class ColetaDetailSerializer(serializers.ModelSerializer):
             'nome': obj.coletor.nome or obj.coletor.username,
             'matricula': obj.coletor.username,
         }
-
-    def get_gps(self, obj):
-        if obj.gps_latitude is None:
-            return None
-        return {'latitude': obj.gps_latitude, 'longitude': obj.gps_longitude}
 
 

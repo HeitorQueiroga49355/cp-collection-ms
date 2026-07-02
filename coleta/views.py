@@ -2,10 +2,12 @@ import random
 import string
 from decimal import Decimal
 
-from django.db import transaction
+import jwt as pyjwt
+from django.conf import settings
+from django.db import connections, transaction
 from django.utils import timezone
 from rest_framework import status
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -19,16 +21,56 @@ from .serializers import (
     ImovelDetailSerializer,
 )
 from .services.fila import publicar_coleta
+from .services.storage import upload_foto_coleta
+
+
+def _decode_core_jwt(request):
+    auth_header = request.headers.get('Authorization', '')
+    if not auth_header.startswith('Bearer '):
+        return None, 'Token JWT ausente ou mal formatado'
+    token = auth_header[7:]
+    try:
+        payload = pyjwt.decode(
+            token,
+            settings.CORE_JWT_SECRET_KEY,
+            algorithms=['HS256'],
+        )
+        return payload, None
+    except pyjwt.ExpiredSignatureError:
+        return None, 'Token expirado'
+    except pyjwt.InvalidTokenError as exc:
+        return None, f'Token inválido: {exc}'
 
 
 def _hoje():
     return timezone.localdate()
 
 
+def _dia_range(date):
+    """Return (start, end) as UTC-aware datetimes spanning the given local date."""
+    from datetime import datetime, time
+    import pytz
+    tz = pytz.timezone('America/Fortaleza')
+    start = tz.localize(datetime.combine(date, time.min))
+    end = tz.localize(datetime.combine(date, time.max))
+    return start, end
+
+
 def _gerar_codigo():
     letras = ''.join(random.choices(string.ascii_uppercase, k=4))
     numeros = ''.join(random.choices(string.digits, k=4))
     return f"{letras}-{numeros}"
+
+
+def _distancia_metros(lng1, lat1, coords):
+    """Distância em metros entre (lng1, lat1) e um ponto GeoJSON [lng, lat]."""
+    from math import asin, cos, radians, sin, sqrt
+
+    lng2, lat2 = coords[0], coords[1]
+    dlat = radians(lat2 - lat1)
+    dlng = radians(lng2 - lng1)
+    a = sin(dlat / 2) ** 2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlng / 2) ** 2
+    return 2 * 6371000 * asin(sqrt(a))
 
 
 
@@ -56,6 +98,9 @@ class ImovelBuscarView(APIView):
             qs = qs.filter(id=valor)
         elif tipo == 'endereco':
             qs = qs.filter(logradouro__icontains=valor)
+            limit = min(int(request.query_params.get('limit', 20)), 100)
+            imoveis = qs[:limit]
+            return Response({'imoveis': ImovelBuscarSerializer(imoveis, many=True).data, 'total': len(imoveis)})
         else:
             return Response({'error': 'Tipo de busca inválido'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -76,6 +121,83 @@ class ImovelDetailView(APIView):
             return Response({'error': 'Imóvel não encontrado'}, status=status.HTTP_404_NOT_FOUND)
 
         return Response(ImovelDetailSerializer(imovel).data)
+
+
+class ImovelProximosView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        lat = request.query_params.get('lat')
+        lng = request.query_params.get('lng')
+        raio = request.query_params.get('raio', 200)
+
+        if lat is None or lng is None:
+            return Response({'error': 'Parâmetros lat e lng são obrigatórios'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            lat = float(lat)
+            lng = float(lng)
+            raio = float(raio)
+        except (TypeError, ValueError):
+            return Response({'error': 'Parâmetros lat, lng e raio devem ser numéricos'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Filtro com $near: retorna apenas imóveis ativos dentro do raio (em metros),
+        # já ordenados do mais próximo ao mais distante. Imóveis sem coordenadas são
+        # excluídos automaticamente (não constam no índice 2dsphere).
+        filtro = {
+            'ativo': True,
+            'location': {
+                '$near': {
+                    '$geometry': {'type': 'Point', 'coordinates': [lng, lat]},
+                    '$maxDistance': raio,
+                }
+            },
+        }
+
+        colecao = connections['default'].get_collection(Imovel._meta.db_table)
+        documentos = list(colecao.find(filtro))
+
+        print(documentos)
+        # $near não devolve a distância; calcula-se manualmente (haversine, em metros).
+        for doc in documentos:
+            coords = (doc.get('location') or {}).get('coordinates')
+            doc['distancia'] = _distancia_metros(lng, lat, coords) if coords else 0.0
+
+
+        # __date (TruncDate) não é suportado pelo backend MongoDB; filtra-se por
+        # intervalo do dia local, mesmo recurso usado em SincronizacaoStatusView.
+        from datetime import datetime, time
+        hoje = _hoje()
+        inicio_hoje = timezone.make_aware(datetime.combine(hoje, time.min))
+        fim_hoje = timezone.make_aware(datetime.combine(hoje, time.max))
+
+        ids = [doc['_id'] for doc in documentos]
+        coletados_hoje = set(
+            Coleta.objects.filter(
+                coletor=request.user,
+                imovel_id__in=ids,
+                data_hora__gte=inicio_hoje,
+                data_hora__lte=fim_hoje,
+            ).values_list('imovel_id', flat=True)
+        )
+
+        imoveis = [
+            {
+                'id': str(doc['_id']),
+                'id_externo': doc.get('id_externo'),
+                'logradouro': doc.get('logradouro'),
+                'numero': doc.get('numero'),
+                'bairro': doc.get('bairro'),
+                'complemento': doc.get('complemento') or '',
+                'elegivel': doc.get('elegivel', True),
+                'distancia': round(doc['distancia'], 1),
+                'coletado_hoje': doc['_id'] in coletados_hoje,
+                'location': doc.get('location'),
+            }
+            for doc in documentos
+        ]
+
+        return Response({'imoveis': imoveis, 'total': len(imoveis)})
 
 
 # ─── Coletas ──────────────────────────────────────────────────────────────────
@@ -107,8 +229,15 @@ class ColetaCreateView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        foto_url = ''
+        arquivo = request.FILES.get('foto')
+        if arquivo:
+            try:
+                foto_url = upload_foto_coleta(arquivo, content_type=arquivo.content_type or 'image/jpeg')
+            except Exception as exc:
+                return Response({'error': f'Falha ao enviar foto: {exc}'}, status=status.HTTP_502_BAD_GATEWAY)
+
         peso_total = Decimal(str(data['peso_total_kg']))
-        gps = data.get('gps')
 
         with transaction.atomic():
             coleta = Coleta.objects.create(
@@ -116,9 +245,7 @@ class ColetaCreateView(APIView):
                 imovel=imovel,
                 data_hora=data['data_hora'],
                 peso_total_kg=peso_total,
-                foto_url=data.get('foto_url') or '',
-                gps_latitude=gps['latitude'] if gps else None,
-                gps_longitude=gps['longitude'] if gps else None,
+                foto_url=foto_url,
                 status=Coleta.Status.CONFIRMADA,
                 observacoes=data.get('observacoes') or '',
                 offline_id=offline_id,
@@ -153,17 +280,30 @@ class ColetaHistoricoView(APIView):
         qs = Coleta.objects.filter(coletor=request.user).select_related('imovel')
 
         if data_param:
-            qs = qs.filter(data_hora__date=data_param)
+            from datetime import date as date_type
+            parsed = date_type.fromisoformat(data_param)
+            start, end = _dia_range(parsed)
+            qs = qs.filter(data_hora__gte=start, data_hora__lte=end)
         elif tipo_periodo == 'hoje':
-            qs = qs.filter(data_hora__date=hoje)
+            start, end = _dia_range(hoje)
+            qs = qs.filter(data_hora__gte=start, data_hora__lte=end)
         elif tipo_periodo == 'ontem':
             from datetime import timedelta
-            qs = qs.filter(data_hora__date=hoje - timedelta(days=1))
+            start, end = _dia_range(hoje - timedelta(days=1))
+            qs = qs.filter(data_hora__gte=start, data_hora__lte=end)
         elif tipo_periodo == 'semana':
             from datetime import timedelta
-            qs = qs.filter(data_hora__date__gte=hoje - timedelta(days=7))
+            start, _ = _dia_range(hoje - timedelta(days=7))
+            _, end = _dia_range(hoje)
+            qs = qs.filter(data_hora__gte=start, data_hora__lte=end)
         elif tipo_periodo == 'mes':
-            qs = qs.filter(data_hora__year=hoje.year, data_hora__month=hoje.month)
+            import calendar
+            from datetime import date as date_type
+            first_day = date_type(hoje.year, hoje.month, 1)
+            last_day = date_type(hoje.year, hoje.month, calendar.monthrange(hoje.year, hoje.month)[1])
+            start, _ = _dia_range(first_day)
+            _, end = _dia_range(last_day)
+            qs = qs.filter(data_hora__gte=start, data_hora__lte=end)
 
         total_coletas = qs.count()
         total_kg = sum(c.peso_total_kg for c in qs)
@@ -217,6 +357,52 @@ class ColetaPendentesView(APIView):
         return Response({'pendentes': resultado, 'total': len(resultado)})
 
 
+# ─── Portal do Morador ────────────────────────────────────────────────────────
+
+class ColetasMoradorView(APIView):
+    """
+    GET /coletas/morador — retorna as coletas dos imóveis do morador autenticado
+    via JWT do core (validado com CORE_JWT_SECRET_KEY), paginadas e ordenadas
+    decrescentemente pela data de criação.
+    """
+    # A autenticação JWT global (JWTAuthentication) valida tokens do próprio
+    # microsserviço contra o modelo Coletor — rodaria antes do permission_classes
+    # e derrubaria com 401 qualquer token do core (assinado para o Usuario/morador).
+    # A validação do token do core é feita manualmente em _decode_core_jwt.
+    authentication_classes = []
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        payload, erro = _decode_core_jwt(request)
+        if erro:
+            return Response({'error': erro}, status=status.HTTP_401_UNAUTHORIZED)
+
+        user_id = payload.get('user_id')
+        if not user_id:
+            return Response({'error': 'Token sem user_id'}, status=status.HTTP_401_UNAUTHORIZED)
+
+        page = max(1, int(request.query_params.get('page', 1)))
+        limit = min(max(1, int(request.query_params.get('limit', 20))), 100)
+
+        qs = (
+            Coleta.objects
+            .filter(imovel__proprietario_id=user_id)
+            .select_related('imovel')
+            .order_by('-criado_em')
+        )
+
+        total = qs.count()
+        offset = (page - 1) * limit
+        coletas_pagina = qs[offset:offset + limit]
+
+        return Response({
+            'coletas': ColetaHistoricoItemSerializer(coletas_pagina, many=True).data,
+            'page': page,
+            'total': total,
+            'total_pages': max(1, -(-total // limit)),
+        })
+
+
 # ─── Sincronização ────────────────────────────────────────────────────────────
 
 class SincronizarView(APIView):
@@ -247,7 +433,6 @@ class SincronizarView(APIView):
                     raise ValueError('Imóvel não elegível para participar')
 
                 peso_total = Decimal(str(item['peso_total_kg']))
-                gps = item.get('gps')
 
                 with transaction.atomic():
                     coleta = Coleta.objects.create(
@@ -256,8 +441,6 @@ class SincronizarView(APIView):
                         data_hora=item['data_hora'],
                         peso_total_kg=peso_total,
                         foto_url=item.get('foto_url') or '',
-                        gps_latitude=gps['latitude'] if gps else None,
-                        gps_longitude=gps['longitude'] if gps else None,
                         status=Coleta.Status.CONFIRMADA,
                         offline_id=offline_id,
                         codigo=_gerar_codigo(),

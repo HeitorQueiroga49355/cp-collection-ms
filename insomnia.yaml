@@ -63,7 +63,9 @@ collection:
             	"titular": 2,
             	"cep": "95900-000",
             	"cidade": "Pau dos Ferros",
-            	"estado": "RN"
+            	"estado": "RN",
+            	"latitude": -6.108600,
+            	"longitude": -38.208900
             }
         headers:
           - name: Authorization
@@ -174,8 +176,7 @@ collection:
             {
               "imovel_id": "6a0cef7bc909ca41a75322b8",
               "data_hora": "2026-05-19T10:00:00Z",
-              "peso_total_kg": "2.5",
-              "gps": { "latitude": -6.1086, "longitude": -38.2089 }
+              "peso_total_kg": "2.5"
             }
         headers:
           - name: Authorization
@@ -463,7 +464,9 @@ collection:
                   "logradouro": "Rua da Apresentação",
                   "numero": "123",
                   "bairro": "Centro",
-                  "elegivel": true
+                  "elegivel": true,
+                  "latitude": -6.108600,
+                  "longitude": -38.208900
                 }
             headers:
               - name: Authorization
@@ -1198,9 +1201,10 @@ collection:
         meta:
           id: fld_d598a3ee876240c1b0859d67db4d69f1
           created: 1779210655361
-          modified: 1779210655361
+          modified: 1779214700000
           sortKey: -40
-          description: "Relatórios agregados: participação, ranking, impacto."
+          description: "Relatórios agregados (participação, ranking, impacto) e relatórios
+            narrativos via LLM (POST /reports/generate e GET /reports/history)."
         children:
           - url: "{{ _.core_url }}/program/reports/impact"
             name: GET /reports/impact
@@ -1255,6 +1259,219 @@ collection:
               isPrivate: false
               description: ""
               sortKey: -90
+            method: GET
+            headers:
+              - name: Authorization
+                value: Bearer {% response 'body', 'req_1973b160d1b644bc9a89164f45d4d305',
+                  'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}
+            settings:
+              renderRequestBody: true
+              encodeUrl: true
+              followRedirects: global
+              cookies:
+                send: true
+                store: true
+              rebuildPath: true
+          - url: "{{ _.core_url }}/reports/generate"
+            name: POST /reports/generate — participacao
+            meta:
+              id: req_c3d4e5f6a7b84c9d0e1f2a3b4c5d6e7f
+              created: 1779214700001
+              modified: 1779214700010
+              isPrivate: false
+              description: "Gera relatório de participação: quem participou, quantas coletas,
+                pontuação por imóvel. Retorna 201 com texto Markdown persistido,
+                ou 502 se o LLM não estiver disponível."
+              sortKey: -73
+            method: POST
+            body:
+              mimeType: application/json
+              text: |-
+                {
+                  "tipo": "participacao",
+                  "periodo": {
+                    "inicio": "2026-01-01",
+                    "fim": "2026-06-30"
+                  },
+                  "programa_id": null
+                }
+            headers:
+              - name: Authorization
+                value: Bearer {% response 'body', 'req_1973b160d1b644bc9a89164f45d4d305',
+                  'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}
+              - name: Content-Type
+                value: application/json
+            settings:
+              renderRequestBody: true
+              encodeUrl: true
+              followRedirects: global
+              cookies:
+                send: true
+                store: true
+              rebuildPath: true
+          - url: "{{ _.core_url }}/reports/generate"
+            name: POST /reports/generate — impacto
+            meta:
+              id: req_e5f6a7b8c9d04e1f2a3b4c5d6e7f80910
+              created: 1779214700003
+              modified: 1779214700010
+              isPrivate: false
+              description: "Gera relatório de impacto: métricas agregadas (peso total,
+                pontos gerados, descontos IPTU concedidos, top bairros)."
+              sortKey: -72
+            method: POST
+            body:
+              mimeType: application/json
+              text: |-
+                {
+                  "tipo": "impacto",
+                  "periodo": {
+                    "inicio": "2026-01-01",
+                    "fim": "2026-06-30"
+                  },
+                  "programa_id": null
+                }
+            headers:
+              - name: Authorization
+                value: Bearer {% response 'body', 'req_1973b160d1b644bc9a89164f45d4d305',
+                  'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}
+              - name: Content-Type
+                value: application/json
+            settings:
+              renderRequestBody: true
+              encodeUrl: true
+              followRedirects: global
+              cookies:
+                send: true
+                store: true
+              rebuildPath: true
+          - url: "{{ _.core_url }}/reports/generate"
+            name: POST /reports/generate — ranking
+            meta:
+              id: req_f6a7b8c9d0e14f2a3b4c5d6e7f8091023
+              created: 1779214700004
+              modified: 1779214700010
+              isPrivate: false
+              description: "Gera relatório de ranking: imóveis ordenados por pontuação,
+                destaques de desempenho e comparação com a média."
+              sortKey: -71
+            method: POST
+            body:
+              mimeType: application/json
+              text: |-
+                {
+                  "tipo": "ranking",
+                  "periodo": {
+                    "inicio": "2026-01-01",
+                    "fim": "2026-06-30"
+                  },
+                  "programa_id": null
+                }
+            headers:
+              - name: Authorization
+                value: Bearer {% response 'body', 'req_1973b160d1b644bc9a89164f45d4d305',
+                  'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}
+              - name: Content-Type
+                value: application/json
+            settings:
+              renderRequestBody: true
+              encodeUrl: true
+              followRedirects: global
+              cookies:
+                send: true
+                store: true
+              rebuildPath: true
+          - url: "{{ _.core_url }}/reports/generate"
+            name: POST /reports/generate — auditoria
+            meta:
+              id: req_a7b8c9d0e1f24a3b4c5d6e7f809102134
+              created: 1779214700005
+              modified: 1779214700010
+              isPrivate: false
+              description: "Gera relatório de auditoria: consistência dos dados, coletas
+                fora do padrão e pontos de atenção para o gestor."
+              sortKey: -70
+            method: POST
+            body:
+              mimeType: application/json
+              text: |-
+                {
+                  "tipo": "auditoria",
+                  "periodo": {
+                    "inicio": "2026-01-01",
+                    "fim": "2026-06-30"
+                  },
+                  "programa_id": null
+                }
+            headers:
+              - name: Authorization
+                value: Bearer {% response 'body', 'req_1973b160d1b644bc9a89164f45d4d305',
+                  'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}
+              - name: Content-Type
+                value: application/json
+            settings:
+              renderRequestBody: true
+              encodeUrl: true
+              followRedirects: global
+              cookies:
+                send: true
+                store: true
+              rebuildPath: true
+          - url: "{{ _.core_url }}/reports/history"
+            name: GET /reports/history (todos)
+            meta:
+              id: req_d4e5f6a7b8c94d0e1f2a3b4c5d6e7f80
+              created: 1779214700002
+              modified: 1779214700010
+              isPrivate: false
+              description: "Lista paginada de todos os relatórios LLM gerados. Apenas gestores."
+              sortKey: -65
+            method: GET
+            headers:
+              - name: Authorization
+                value: Bearer {% response 'body', 'req_1973b160d1b644bc9a89164f45d4d305',
+                  'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}
+            settings:
+              renderRequestBody: true
+              encodeUrl: true
+              followRedirects: global
+              cookies:
+                send: true
+                store: true
+              rebuildPath: true
+          - url: "{{ _.core_url }}/reports/history?tipo=participacao"
+            name: GET /reports/history?tipo=participacao
+            meta:
+              id: req_b8c9d0e1f2a34b4c5d6e7f809102134a5
+              created: 1779214700006
+              modified: 1779214700010
+              isPrivate: false
+              description: "Histórico filtrado por tipo. Troque o valor de `tipo` por
+                impacto | ranking | auditoria conforme necessário."
+              sortKey: -64
+            method: GET
+            headers:
+              - name: Authorization
+                value: Bearer {% response 'body', 'req_1973b160d1b644bc9a89164f45d4d305',
+                  'b64::JC5hY2Nlc3M=::46b', 'no-history', 60, 'never' %}
+            settings:
+              renderRequestBody: true
+              encodeUrl: true
+              followRedirects: global
+              cookies:
+                send: true
+                store: true
+              rebuildPath: true
+          - url: "{{ _.core_url }}/reports/history?programa_id=1"
+            name: GET /reports/history?programa_id=1
+            meta:
+              id: req_c9d0e1f2a3b44c5d6e7f8091021345b6
+              created: 1779214700007
+              modified: 1779214700010
+              isPrivate: false
+              description: "Histórico filtrado por programa. Substitua `1` pelo id do
+                programa desejado. Pode combinar com ?tipo= na mesma query string."
+              sortKey: -63
             method: GET
             headers:
               - name: Authorization
@@ -1618,6 +1835,39 @@ collection:
                 send: true
                 store: true
               rebuildPath: true
+          - url: "{{ _.ms_url }}/imoveis/proximos?lat=-6.1086&lng=-38.2089&raio=200"
+            name: GET /imoveis/proximos (por proximidade — $geoNear)
+            meta:
+              id: req_b3c1f0a29d8e4f5a8c6b7d2e1f0a9b8c
+              created: 1779210655386
+              modified: 1779210655386
+              isPrivate: false
+              description: "Imóveis num raio (metros, default 200) ordenados por
+                distância crescente. Cada item traz distancia, id_externo,
+                logradouro, numero, bairro, complemento, elegivel e
+                coletado_hoje (coleta do coletor autenticado no dia). Imóveis sem
+                coordenadas são excluídos."
+              sortKey: -75
+            method: GET
+            parameters:
+              - name: lat
+                value: "-6.1086"
+              - name: lng
+                value: "-38.2089"
+              - name: raio
+                value: "200"
+            headers:
+              - name: Authorization
+                value: Bearer {% response 'body', 'req_f0d256cae7f44d20be32363f6151c6aa',
+                  'b64::JC50b2tlbg==::46b', 'no-history', 60, 'never' %}
+            settings:
+              renderRequestBody: true
+              encodeUrl: true
+              followRedirects: global
+              cookies:
+                send: true
+                store: true
+              rebuildPath: true
       - name: 4. Coletas
         meta:
           id: fld_4dd62aba77dd4b9991db4b0c60503a1e
@@ -1645,10 +1895,6 @@ collection:
                   "imovel_id": "SUBSTITUA_OBJECTID_DO_IMOVEL",
                   "data_hora": "2026-05-19T10:00:00Z",
                   "peso_total_kg": "2.5",
-                  "gps": {
-                    "latitude": -6.1086,
-                    "longitude": -38.2089
-                  },
                   "foto_url": null,
                   "observacoes": "",
                   "offline_id": null
@@ -1769,7 +2015,6 @@ collection:
                       "imovel_id": "SUBSTITUA_OBJECTID_DO_IMOVEL",
                       "data_hora": "2026-05-19T07:15:00-03:00",
                       "peso_total_kg": "4.8",
-                      "gps": { "latitude": -6.1086, "longitude": -38.2089 },
                       "foto_url": null
                     }
                   ]

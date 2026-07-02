@@ -1,76 +1,130 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+#  cp-collection-ms — compose STANDALONE para desenvolvimento isolado do MS
+#
+#  Use este arquivo quando quiser trabalhar só no MS, sem subir o stack completo.
+#  Para subir o sistema inteiro:
+#    cd ../Coleta-Premiada && docker compose up
+#
+#  Portas escolhidas para não conflitar com o stack consolidado:
+#    MongoDB  → 27019 (stack usa 27018, nativo usa 27017)
+#    RabbitMQ → 5673 / 15673 (stack usa 5672 / 15672)
+#    MS API   → 8002 (mesma porta — sobe um ou outro, não os dois juntos)
+# ═══════════════════════════════════════════════════════════════════════════════
+
 services:
-  # MongoDB - Banco de dados do microsserviço de coletas
-  mongodb:
+
+  ms-db:
     image: mongo:7.0
-    container_name: coleta-mongodb
     restart: unless-stopped
+    env_file: .env
     environment:
-      MONGO_INITDB_ROOT_USERNAME: coleta_user
-      MONGO_INITDB_ROOT_PASSWORD: senha123
-      MONGO_INITDB_DATABASE: coleta_db
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
+      MONGO_INITDB_DATABASE: ${MONGO_INITDB_DATABASE}
     ports:
-      - "27017:27017"
+      - "27019:27017"
     volumes:
-      - mongodb_data:/data/db
+      - ms-db-data:/data/db
     networks:
-      - coleta-ms-network
+      - ms-local-network
     healthcheck:
-      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      test: ["CMD-SHELL", "echo 'db.runCommand(\"ping\").ok' | mongosh localhost:27017/test --quiet"]
       interval: 10s
       timeout: 5s
       retries: 5
 
-  # Microsserviço de coletas (Django)
-  app:
-    build:
-      context: .
-      target: development
-    container_name: coleta-ms-app
+  rabbitmq-local:
+    image: rabbitmq:3-management-alpine
     restart: unless-stopped
     env_file: .env
     environment:
-      MONGO_HOST: mongodb
-      RABBITMQ_HOST: rabbitmq   # container do Coleta-Premiada via rede compartilhada
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
+    ports:
+      - "5673:5672"
+      - "15673:15672"
+    networks:
+      - ms-local-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_running"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  ms:
+    build:
+      context: .
+      target: development
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      MONGO_HOST: ms-db
+      MONGO_PORT: "27017"
+      RABBITMQ_HOST: rabbitmq-local
+    command: python manage.py runserver 0.0.0.0:8001
     ports:
       - "8002:8001"
     depends_on:
-      mongodb:
+      ms-db:
+        condition: service_healthy
+      rabbitmq-local:
         condition: service_healthy
     volumes:
       - .:/app
     networks:
-      - coleta-ms-network
-      - coleta-shared  # acessa o rabbitmq do Coleta-Premiada
+      ms-local-network: {}
+      coleta-observability:
+        aliases:
+          - ms-dev
 
-  # Consumer da fila 'imoveis' (publicada pelo Coleta-Premiada Core)
-  coleta-ms-consumer:
+  ms-consumer:
     build:
       context: .
       target: development
-    container_name: coleta-ms-consumer
     restart: unless-stopped
     env_file: .env
     environment:
-      MONGO_HOST: mongodb
+      MONGO_HOST: ms-db
+      MONGO_PORT: "27017"
       RABBITMQ_HOST: rabbitmq
     command: python manage.py consumir_imoveis
     depends_on:
-      mongodb:
+      ms-db:
         condition: service_healthy
     volumes:
       - .:/app
     networks:
-      - coleta-ms-network
-      - coleta-shared
+      ms-local-network: {}
+      coleta-observability: {}
+
+  mongodb-exporter:
+    image: percona/mongodb_exporter:0.40
+    restart: unless-stopped
+    environment:
+      MONGODB_URI: "mongodb://${MONGO_USER}:${MONGO_PASSWORD}@ms-db:27017/?authSource=admin"
+    depends_on:
+      ms-db:
+        condition: service_healthy
+    networks:
+      ms-local-network: {}
+      coleta-observability:
+        aliases:
+          - mongodb-exporter
+    deploy:
+      resources:
+        limits:
+          cpus: "0.1"
+          memory: 64M
+        reservations:
+          cpus: "0.05"
+          memory: 32M
 
 volumes:
-  mongodb_data:
-    driver: local
+  ms-db-data:
 
 networks:
-  coleta-ms-network:
+  ms-local-network:
     driver: bridge
-  coleta-shared:
-    # Rede criada pelo docker-compose do Coleta-Premiada; aqui só anexamos.
+  coleta-observability:
     external: true
-    name: coleta-shared
+    name: coleta-observability

@@ -4,6 +4,8 @@ from django.db import models
 class ImovelManager(models.Manager):
     def upsert_from_evento(self, payload: dict):
         inscricao = payload['inscricao_imobiliaria']
+        latitude = payload.get('latitude')
+        longitude = payload.get('longitude')
         defaults = {
             # O Core ainda não envia IPTU; usa a inscrição como placeholder
             # para satisfazer a unicidade do campo.
@@ -16,7 +18,9 @@ class ImovelManager(models.Manager):
             'telefone': payload.get('telefone', ''),
             'elegivel': payload.get('elegivel', True),
             'motivo_inelegivel': payload.get('motivo_inelegivel', ''),
+            'location': self.model.montar_location(latitude, longitude),
             'ativo': payload.get('ativo', True),
+            'proprietario_id': payload.get('proprietario_id'),
         }
         return self.update_or_create(id_externo=inscricao, defaults=defaults)
 

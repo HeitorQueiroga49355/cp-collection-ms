@@ -114,9 +114,6 @@ coleta_payload:
     - tipo: papel
       peso_kg: "1.000"
   foto_url: "https://exemplo.test/foto.jpg"
-  gps:
-    latitude: -6.1086
-    longitude: -38.2089
   observacoes: "Coleta gerada pelo test_integration.py"
 
 # -----------------------------------------------------------------------------
