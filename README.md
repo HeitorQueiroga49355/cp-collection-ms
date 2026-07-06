@@ -14,6 +14,7 @@ O coletor (agente de campo) usa este microsserviço para localizar imóveis apto
 - [Endpoints da API](#endpoints-da-api)
 - [Mensageria (RabbitMQ)](#mensageria-rabbitmq)
 - [Armazenamento de fotos (MinIO)](#armazenamento-de-fotos-minio)
+- [Backup e restauração do MongoDB](#backup-e-restauração-do-mongodb)
 - [Auditoria](#auditoria)
 - [Testes e ferramentas de apoio](#testes-e-ferramentas-de-apoio)
 - [Comandos de gerenciamento (management commands)](#comandos-de-gerenciamento-management-commands)
@@ -62,6 +63,7 @@ Isso inicia:
 - `mongodb` — banco do microsserviço (host: `27018`, dentro da rede: `27017`)
 - `app` — aplicação Django (host: `8002`, dentro do container: `8001`)
 - `coleta-ms-consumer` — consumidor da fila `imoveis` (`python manage.py consumir_imoveis`)
+- `mongo-backup` — backup diário do MongoDB via `mongodump` (ver [Backup e restauração do MongoDB](#backup-e-restauração-do-mongodb))
 
 > O serviço `app` espera uma rede externa `coleta-shared`, criada pelo `docker-compose` do projeto **Coleta-Premiada** (Core), para acessar o RabbitMQ compartilhado entre os dois sistemas. Suba o Core antes (ou crie a rede manualmente: `docker network create coleta-shared`).
 
@@ -157,6 +159,52 @@ Duas filas compartilhadas com o Core:
 ## Armazenamento de fotos (MinIO)
 
 `coleta/services/storage.py` faz upload da foto da coleta para o bucket configurado em `MINIO_BUCKET_NAME` (criado automaticamente se não existir) e retorna a URL pública do objeto, salva em `Coleta.foto_url`.
+
+## Backup e restauração do MongoDB
+
+O serviço `mongo-backup` (definido em [`mongo-backup/`](mongo-backup/)) sobe junto com o `docker-compose` e mantém backups automáticos do banco `coleta_db`:
+
+- Roda `mongodump` todo dia às **03h** (cron `0 3 * * *`, configurável via `CRON_SCHEDULE`).
+- Compacta o dump em um único arquivo com `--archive` + `--gzip` (`coleta_db_AAAAMMDD_HHMMSS.gz`).
+- Mantém apenas os **7 backups mais recentes** (configurável via `BACKUP_RETENTION`), apagando os mais antigos a cada execução.
+- Grava tudo no volume nomeado `mongo_backups`, montado em `/backups/mongo` — os arquivos sobrevivem a `docker-compose down` (mas não a `docker-compose down -v`).
+
+### Backup manual (sem esperar o cron)
+
+```bash
+docker exec coleta-mongo-backup /scripts/backup.sh
+```
+
+### Listar backups disponíveis
+
+```bash
+docker exec coleta-mongo-backup ls -lh /backups/mongo
+```
+
+### Recuperação de desastre (restore)
+
+`mongo-backup/restore.sh` usa `mongorestore` para repor um dump no MongoDB. Por padrão restaura o backup **mais recente** e pede confirmação antes de continuar, pois **substitui (`--drop`) as collections existentes** em `coleta_db`:
+
+```bash
+# Restaura o backup mais recente, com confirmação interativa
+docker exec -it coleta-mongo-backup /scripts/restore.sh
+
+# Restaura um arquivo específico (nome do arquivo dentro de /backups/mongo)
+docker exec -it coleta-mongo-backup /scripts/restore.sh coleta_db_20260101_030000.gz
+
+# Pula a confirmação interativa (uso em scripts/CI)
+docker exec coleta-mongo-backup /scripts/restore.sh -y
+```
+
+Passo a passo recomendado em caso de perda de dados:
+
+1. Confirme que o container `mongodb` está saudável: `docker compose ps mongodb`.
+2. Liste os backups disponíveis (comando acima) e escolha o arquivo desejado (ou deixe em branco para usar o mais recente).
+3. Execute o `restore.sh` correspondente. Ele roda `mongorestore --drop`, ou seja, as collections presentes no dump são recriadas do zero; collections que não constam no dump **não** são apagadas.
+4. Valide os dados (ex.: `docker exec -it coleta-mongodb mongosh "mongodb://coleta_user:senha123@localhost:27017/coleta_db?authSource=admin"`).
+5. Se a aplicação (`app`/`coleta-ms-consumer`) estava de pé durante a restauração, reinicie-a (`docker compose restart app coleta-ms-consumer`) para garantir que conexões/caches fiquem consistentes com os dados restaurados.
+
+> O `mongo-backup` só conecta no `mongodb` da rede `coleta-ms-network` — ele não expõe portas nem precisa da rede `coleta-shared`.
 
 ## Auditoria
 
