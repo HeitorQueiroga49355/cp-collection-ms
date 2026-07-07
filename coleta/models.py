@@ -21,6 +21,8 @@ class Imovel(models.Model):
     elegivel = models.BooleanField('elegível', default=True)
     motivo_inelegivel = models.TextField('motivo inelegível', blank=True)
     proprietario_id = models.IntegerField('ID do proprietário (core)', null=True, blank=True, db_index=True)
+    # Armazena o número total de moradores residentes no imóvel (dado sincronizado do Core)
+    num_moradores = models.IntegerField('número de moradores', default=1)
     location = models.JSONField('localização (GeoJSON)', null=True, blank=True)
     sincronizado_em = models.DateTimeField('sincronizado em', auto_now=True)
     ativo = models.BooleanField('ativo', default=True)

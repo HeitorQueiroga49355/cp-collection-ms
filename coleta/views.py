@@ -525,3 +525,175 @@ class SincronizacaoStatusView(APIView):
             'proxima_tentativa_automatica': None,
             'detalhes': detalhes,
         })
+
+
+# ─── Supervisor / Gestor Portal ──────────────────────────────────────────────
+
+import os
+import json
+import urllib.request
+import urllib.error
+
+def _get_core_user_profile(request):
+    auth_header = request.headers.get('Authorization', '')
+    if not auth_header.startswith('Bearer '):
+        return None, 'Token JWT ausente ou mal formatado'
+    
+    core_api_url = os.getenv('CORE_API_URL')
+    if not core_api_url:
+        from django.conf import settings
+        if settings.DEBUG and os.getenv('MONGO_HOST') == 'localhost':
+            core_api_url = 'http://localhost:8001'
+        else:
+            core_api_url = 'http://core:8000'
+            
+    url = f"{core_api_url}/api/accounts/auth/me"
+    
+    req = urllib.request.Request(url)
+    req.add_header('Authorization', auth_header)
+    
+    try:
+        with urllib.request.urlopen(req, timeout=5) as response:
+            if response.status == 200:
+                data = json.loads(response.read().decode('utf-8'))
+                return data, None
+            else:
+                return None, f"Erro na validação com o Core (Status {response.status})"
+    except urllib.error.HTTPError as e:
+        return None, f"Erro na validação com o Core (Status {e.code})"
+    except urllib.error.URLError as e:
+        return None, f"Falha ao conectar ao Core: {e.reason}"
+    except Exception as e:
+        return None, f"Erro inesperado: {e}"
+
+
+class ImovelSupervisorListView(APIView):
+    """
+    GET /api/supervisor/imoveis - Lista paginada de todos os imóveis para supervisor/gestor.
+    Filtro por busca textual (IPTU, logradouro, bairro, morador).
+    """
+    authentication_classes = []
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        # Obtém e valida os dados de perfil do usuário a partir do token no Django Core.
+        user_data, erro = _get_core_user_profile(request)
+        if erro:
+            return Response({'error': erro}, status=status.HTTP_401_UNAUTHORIZED)
+        
+        perfil = user_data.get('perfil')
+        if perfil not in ['supervisor', 'gestor']:
+            return Response({'error': 'Acesso negado: perfil sem privilégios.'}, status=status.HTTP_403_FORBIDDEN)
+
+        search = request.query_params.get('search', '').strip()
+        page = max(1, int(request.query_params.get('page', 1)))
+        limit = min(max(1, int(request.query_params.get('limit', 20))), 100)
+
+        from django.db.models import Q
+        qs = Imovel.objects.all()
+        if search:
+            qs = qs.filter(
+                Q(iptu__icontains=search) |
+                Q(logradouro__icontains=search) |
+                Q(bairro__icontains=search) |
+                Q(morador__icontains=search)
+            )
+
+        qs = qs.order_by('logradouro', 'numero')
+
+        total = qs.count()
+        offset = (page - 1) * limit
+        imoveis_pagina = qs[offset:offset + limit]
+
+        serialized_data = []
+        for imovel in imoveis_pagina:
+            serialized_data.append({
+                'id': imovel.id_externo,
+                'inscricao': imovel.iptu,
+                'titular_nome': imovel.morador,
+                'titular': imovel.proprietario_id or 0,
+                'bairro': imovel.bairro,
+                'num_moradores': imovel.num_moradores or 1,
+                'data_adesao': imovel.sincronizado_em.isoformat() if imovel.sincronizado_em else '',
+                'ativo': imovel.ativo
+            })
+
+        return Response({
+            'count': total,
+            'next': None,
+            'previous': None,
+            'results': serialized_data
+        })
+
+
+class ColetaSupervisorListView(APIView):
+    """
+    GET /api/supervisor/coletas - Lista geral de coletas para supervisor/gestor.
+    Filtros por data (data_inicio, data_fim).
+    """
+    authentication_classes = []
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        user_data, erro = _get_core_user_profile(request)
+        if erro:
+            return Response({'error': erro}, status=status.HTTP_401_UNAUTHORIZED)
+        
+        perfil = user_data.get('perfil')
+        if perfil not in ['supervisor', 'gestor']:
+            return Response({'error': 'Acesso negado: perfil sem privilégios.'}, status=status.HTTP_403_FORBIDDEN)
+
+        data_inicio = request.query_params.get('data_inicio', '').strip()
+        data_fim = request.query_params.get('data_fim', '').strip()
+        page = max(1, int(request.query_params.get('page', 1)))
+        limit = min(max(1, int(request.query_params.get('limit', 20))), 100)
+
+        qs = Coleta.objects.select_related('imovel', 'coletor').all().order_by('-data_hora')
+
+        if data_inicio:
+            try:
+                from datetime import date as date_type, datetime, time
+                from django.utils.timezone import make_aware
+                parsed_inicio = date_type.fromisoformat(data_inicio)
+                # Converte para datetime ciente do fuso no início do dia (00:00:00)
+                inicio_dt = make_aware(datetime.combine(parsed_inicio, time.min))
+                qs = qs.filter(data_hora__gte=inicio_dt)
+            except ValueError:
+                pass
+
+        if data_fim:
+            try:
+                from datetime import date as date_type, datetime, time
+                from django.utils.timezone import make_aware
+                parsed_fim = date_type.fromisoformat(data_fim)
+                # Converte para datetime ciente do fuso no final do dia (23:59:59.999999)
+                fim_dt = make_aware(datetime.combine(parsed_fim, time.max))
+                qs = qs.filter(data_hora__lte=fim_dt)
+            except ValueError:
+                pass
+
+        total = qs.count()
+        offset = (page - 1) * limit
+        coletas_pagina = qs[offset:offset + limit]
+
+        serialized_data = []
+        for coleta in coletas_pagina:
+            serialized_data.append({
+                'id': str(coleta.id),
+                'id_microservico': str(coleta.coleta_id),
+                'imovel': coleta.imovel.id_externo,
+                'imovel_inscricao': coleta.imovel.iptu,
+                'titular_nome': coleta.imovel.morador,
+                'programa': None,
+                'programa_nome': None,
+                'pontuacao': 0,
+                'data_hora_coleta': coleta.data_hora.isoformat() if coleta.data_hora else '',
+                'peso_kg': float(coleta.peso_total_kg)
+            })
+
+        return Response({
+            'count': total,
+            'next': None,
+            'previous': None,
+            'results': serialized_data
+        })

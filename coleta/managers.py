@@ -3,6 +3,10 @@ from django.db import models
 
 class ImovelManager(models.Manager):
     def upsert_from_evento(self, payload: dict):
+        """
+        Recebe a mensagem/evento vinda da fila de sincronização (RabbitMQ) e realiza a
+        criação ou atualização (upsert) do registro de imóvel correspondente no MongoDB.
+        """
         inscricao = payload['inscricao_imobiliaria']
         latitude = payload.get('latitude')
         longitude = payload.get('longitude')
@@ -21,6 +25,7 @@ class ImovelManager(models.Manager):
             'location': self.model.montar_location(latitude, longitude),
             'ativo': payload.get('ativo', True),
             'proprietario_id': payload.get('proprietario_id'),
+            'num_moradores': payload.get('num_moradores', 1),
         }
         return self.update_or_create(id_externo=inscricao, defaults=defaults)
 

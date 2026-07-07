@@ -60,7 +60,7 @@ services:
     environment:
       MONGO_HOST: ms-db
       MONGO_PORT: "27017"
-      RABBITMQ_HOST: rabbitmq-local
+      RABBITMQ_HOST: rabbitmq
     command: python manage.py runserver 0.0.0.0:8001
     ports:
       - "8002:8001"

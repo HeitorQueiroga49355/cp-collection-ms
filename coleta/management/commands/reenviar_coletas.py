@@ -20,7 +20,9 @@ class Command(BaseCommand):
             enviado = publicar_coleta(
                 coleta_id=str(coleta.coleta_id),
                 inscricao_imobiliaria=coleta.imovel.id_externo,
-                pontuacao=str(coleta.pontos_gerados),
+                #foi retirada a linha pontuação, pois ela estava causando erro no front ao tentar pegar as coletas
+                #pois esse campo não tem no model de publicar_coleta e o calculo de pontuação é feito no Core
+                #pontuacao=str(coleta.pontos_gerados),
                 peso_total_kg=str(coleta.peso_total_kg),
                 data_hora=coleta.data_hora.isoformat(),
             )
