@@ -115,3 +115,40 @@ class Coleta(models.Model):
     def __str__(self):
         return f"Coleta {self.coleta_id} — {self.coletor}"
 
+
+# ─── Auditoria ────────────────────────────────────────────────────────────────
+
+class EventoAuditoria(models.Model):
+    ORIGEM_CHOICES = [
+        ('api', 'API (mobile)'),
+        ('fila_publish', 'Publicação em fila'),
+        ('fila_consume', 'Consumo de fila'),
+        ('management_command', 'Comando administrativo'),
+    ]
+    NIVEL_CHOICES = [
+        ('info', 'Info'),
+        ('warning', 'Atenção'),
+        ('error', 'Erro'),
+    ]
+
+    timestamp = models.DateTimeField(auto_now_add=True)
+    origem = models.CharField(max_length=30, choices=ORIGEM_CHOICES)
+    nivel = models.CharField(max_length=10, choices=NIVEL_CHOICES, default='info')
+    evento = models.CharField(max_length=100)
+    coletor_id = models.CharField(max_length=50, null=True, blank=True)
+    coleta_offline_id = models.CharField(max_length=50, null=True, blank=True)
+    fila = models.CharField(max_length=50, null=True, blank=True)
+    detalhe = models.JSONField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'evento_auditoria'
+        ordering = ['-timestamp']
+        indexes = [
+            models.Index(fields=['timestamp']),
+            models.Index(fields=['origem']),
+            models.Index(fields=['coletor_id']),
+        ]
+
+    def __str__(self):
+        return f"[{self.origem}] {self.evento} ({self.timestamp:%Y-%m-%d %H:%M})"
+

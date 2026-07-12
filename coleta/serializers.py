@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import Coleta, Imovel
+from .models import Coleta, EventoAuditoria, Imovel
 
 
 # ─── Imovel ───────────────────────────────────────────────────────────────────
@@ -156,3 +156,18 @@ class ColetaDetailSerializer(serializers.ModelSerializer):
         }
 
 
+
+
+
+# ─── Auditoria ────────────────────────────────────────────────────────────────
+
+class EventoAuditoriaSerializer(serializers.ModelSerializer):
+    id = serializers.CharField(read_only=True)
+
+    class Meta:
+        model = EventoAuditoria
+        fields = [
+            'id', 'timestamp', 'origem', 'nivel', 'evento',
+            'coletor_id', 'coleta_offline_id', 'fila', 'detalhe',
+        ]
+        read_only_fields = fields

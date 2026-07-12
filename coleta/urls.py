@@ -6,6 +6,7 @@ from .views import (
     ColetaHistoricoView,
     ColetasMoradorView,
     ColetaPendentesView,
+    EventoAuditoriaListView,
     ImovelBuscarView,
     ImovelDetailView,
     ImovelProximosView,
@@ -26,4 +27,6 @@ urlpatterns = [
 
     path('sincronizar', SincronizarView.as_view(), name='sincronizar'),
     path('sincronizacao/status', SincronizacaoStatusView.as_view(), name='sincronizacao-status'),
+
+    path('audit/eventos', EventoAuditoriaListView.as_view(), name='audit-eventos'),
 ]

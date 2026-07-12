@@ -260,7 +260,9 @@ collection:
               created: 1779210655371
               modified: 1779210655371
               isPrivate: false
-              description: ""
+              description: "Requer perfil gestor (gerente_geral recebe 403). O campo
+                `cidade` é obrigatório e deve ser a PK da cidade do gestor
+                autenticado. Retorna 400 se cidade omitida ou de outra cidade."
               sortKey: -90
             method: POST
             body:
@@ -268,6 +270,7 @@ collection:
               text: |-
                 {
                   "nome": "Programa Apresentação",
+                  "cidade": 1,
                   "data_inicio": "2026-05-01",
                   "data_fim": "2026-12-31",
                   "desconto_maximo": "40.00",
