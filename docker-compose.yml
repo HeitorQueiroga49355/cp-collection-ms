@@ -33,7 +33,7 @@ services:
       timeout: 5s
       retries: 5
 
-  rabbitmq:
+  rabbitmq-local:
     image: rabbitmq:3-management-alpine
     restart: unless-stopped
     env_file: .env
@@ -60,19 +60,22 @@ services:
     environment:
       MONGO_HOST: ms-db
       MONGO_PORT: "27017"
-      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_HOST: rabbitmq-local
     command: python manage.py runserver 0.0.0.0:8001
     ports:
       - "8002:8001"
     depends_on:
       ms-db:
         condition: service_healthy
-      rabbitmq:
+      rabbitmq-local:
         condition: service_healthy
     volumes:
       - .:/app
     networks:
-      - ms-local-network
+      ms-local-network: {}
+      coleta-observability:
+        aliases:
+          - ms-dev
 
   ms-consumer:
     build:
@@ -88,12 +91,33 @@ services:
     depends_on:
       ms-db:
         condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
     volumes:
       - .:/app
     networks:
-      - ms-local-network
+      ms-local-network: {}
+      coleta-observability: {}
+
+  mongodb-exporter:
+    image: percona/mongodb_exporter:0.40
+    restart: unless-stopped
+    environment:
+      MONGODB_URI: "mongodb://${MONGO_USER}:${MONGO_PASSWORD}@ms-db:27017/?authSource=admin"
+    depends_on:
+      ms-db:
+        condition: service_healthy
+    networks:
+      ms-local-network: {}
+      coleta-observability:
+        aliases:
+          - mongodb-exporter
+    deploy:
+      resources:
+        limits:
+          cpus: "0.1"
+          memory: 64M
+        reservations:
+          cpus: "0.05"
+          memory: 32M
 
 volumes:
   ms-db-data:
@@ -101,3 +125,6 @@ volumes:
 networks:
   ms-local-network:
     driver: bridge
+  coleta-observability:
+    external: true
+    name: coleta-observability

@@ -4,6 +4,8 @@ import os
 
 import pika
 
+from coleta.services.auditoria import registrar_evento
+
 logger = logging.getLogger(__name__)
 
 
@@ -44,8 +46,20 @@ def publicar_coleta(
 
         conexao.close()
         logger.info(f"Coleta publicada na fila: {payload}")
+        registrar_evento(
+            'fila_publish', 'coleta_publicada',
+            fila='coletas',
+            coleta_offline_id=None,
+            detalhe={'coleta_id': coleta_id},
+        )
         return True
 
     except Exception as e:
         logger.error(f"Erro ao publicar coleta na fila: {e}")
+        registrar_evento(
+            'fila_publish', 'fila_publish_falhou',
+            nivel='error',
+            fila='coletas',
+            detalhe={'erro': str(e), 'coleta_id': coleta_id},
+        )
         return False
