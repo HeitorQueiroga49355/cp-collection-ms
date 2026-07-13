@@ -10,6 +10,13 @@ chmod +x /scripts/env.sh
 mkdir -p "${BACKUP_DIR:-/backups/mongo}"
 touch /var/log/cron.log
 
+# Configura o cliente MinIO se as variáveis estiverem presentes.
+if [ -n "${MINIO_ENDPOINT:-}" ] && [ -n "${MINIO_ACCESS_KEY:-}" ]; then
+  mc alias set minio "http://${MINIO_ENDPOINT}" "$MINIO_ACCESS_KEY" "$MINIO_SECRET_KEY" --quiet
+  mc mb --ignore-existing "minio/${MINIO_BACKUP_BUCKET:-mongo-backups}" || true
+  echo "MinIO configurado: http://${MINIO_ENDPOINT} (bucket: ${MINIO_BACKUP_BUCKET:-mongo-backups})"
+fi
+
 # Instalado via `crontab <file>` (crontab de usuário, sem campo de username) —
 # não usar /etc/cron.d/ aqui, pois esse diretório é lido como crontab de
 # sistema e exige um campo de usuário extra na linha.

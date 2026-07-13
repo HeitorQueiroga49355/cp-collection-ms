@@ -5,9 +5,9 @@ services:
     container_name: coleta-mongodb
     restart: unless-stopped
     environment:
-      MONGO_INITDB_ROOT_USERNAME: coleta_user
-      MONGO_INITDB_ROOT_PASSWORD: senha123
-      MONGO_INITDB_DATABASE: coleta_db
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
+      MONGO_INITDB_DATABASE: ${MONGO_INITDB_DATABASE:-coleta_db}
     ports:
       # Host 27018 para não conflitar com um MongoDB nativo na 27017.
       # Dentro da rede docker o app continua acessando via mongodb:27017.
@@ -56,12 +56,17 @@ services:
     environment:
       MONGO_HOST: mongodb
       MONGO_PORT: 27017
-      MONGO_USER: coleta_user
-      MONGO_PASSWORD: senha123
-      MONGO_DB: coleta_db
+      MONGO_USER: ${MONGO_USER}
+      MONGO_PASSWORD: ${MONGO_PASSWORD}
+      MONGO_DB: ${MONGO_INITDB_DATABASE:-coleta_db}
       BACKUP_DIR: /backups/mongo
-      BACKUP_RETENTION: 7
-      CRON_SCHEDULE: 0 3 * * *
+      BACKUP_RETENTION: ${BACKUP_RETENTION:-7}
+      CRON_SCHEDULE: ${CRON_SCHEDULE:-0 3 * * *}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-}
+      MINIO_BACKUP_BUCKET: ${MINIO_BACKUP_BUCKET:-mongo-backups}
+      NOTIFY_WEBHOOK_URL: ${NOTIFY_WEBHOOK_URL:-}
     depends_on:
       mongodb:
         condition: service_healthy
@@ -69,6 +74,7 @@ services:
       - mongo_backups:/backups/mongo
     networks:
       - coleta-ms-network
+      - coleta-shared
 
   # Consumer da fila 'imoveis' (publicada pelo Coleta-Premiada Core)
   coleta-ms-consumer:
