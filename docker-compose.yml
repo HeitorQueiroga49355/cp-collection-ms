@@ -127,11 +127,50 @@ services:
       ms-local-network: {}
       coleta-observability: {}
 
+  # Manutencao automatizada do MongoDB:
+  # - cleanup: diario as 03:15 (remove dados antigos)
+  # - indices: semanal aos domingos as 04:00 (analise/rebuild)
+  mongo-maintenance:
+    image: mongo:7.0
+    env_file: .env
+    environment:
+      MONGO_HOST: ms-db
+      MONGO_PORT: "27017"
+      MONGO_USER: ${MONGO_USER}
+      MONGO_PASSWORD: ${MONGO_PASSWORD}
+      MONGO_DB: ${MONGO_INITDB_DATABASE:-coleta_db}
+      MONGO_AUTH_DB: admin
+      MONGO_RETENTION_DAYS: ${MONGO_RETENTION_DAYS:-90}
+      MONGO_CLEANUP_BATCH: ${MONGO_CLEANUP_BATCH:-5000}
+      MONGO_CLEANUP_COLLECTIONS: ${MONGO_CLEANUP_COLLECTIONS:-audit_logs}
+    volumes:
+      - ./scripts/maintenance:/maintenance:ro
+    command: sh /maintenance/mongo_cron.sh
+    depends_on:
+      ms-db:
+        condition: service_healthy
+    networks:
+      - ms-local-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.1"
+          memory: 128M
+        reservations:
+          cpus: "0.05"
+          memory: 64M
+
   mongodb-exporter:
     image: percona/mongodb_exporter:0.40
     restart: unless-stopped
     environment:
       MONGODB_URI: "mongodb://${MONGO_USER}:${MONGO_PASSWORD}@ms-db:27017/?authSource=admin"
+    command:
+      - --collector.dbstats
+      - --collector.replicasetstatus
+      - --collector.diagnosticdata
+      - --collector.collstats-colls=coleta_db.audit_logs
     depends_on:
       ms-db:
         condition: service_healthy

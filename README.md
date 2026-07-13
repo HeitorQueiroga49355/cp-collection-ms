@@ -1,227 +1,217 @@
-# cp-collection-ms
+# cp-collection-ms — Microservico de Coletas
 
-Microsserviço de **coletas de materiais recicláveis**, desenvolvido em Django + Django REST Framework com persistência em **MongoDB**. Faz parte do ecossistema **Coleta Premiada**, comunicando-se de forma assíncrona via **RabbitMQ** com o sistema **Core** (monolito modular em Postgres) responsável pelo cadastro de imóveis e pontuação dos moradores.
+## Proposito do Sistema
 
-O coletor (agente de campo) usa este microsserviço para localizar imóveis aptos a participar do programa e registrar as coletas feitas em campo, inclusive em modo offline, sincronizando posteriormente.
+O **cp-collection-ms** e o microservico responsavel pelo registro de **coletas de materiais reciclaveis** em campo, utilizado pelos **coletores** (agentes de campo) via app mobile. Ele faz parte do ecossistema **Coleta Premiada** e se comunica de forma assincrona com o **Core** (monolito Django + PostgreSQL) via **RabbitMQ**.
 
-## Sumário
+### O que ele resolve
 
-- [Arquitetura](#arquitetura)
-- [Stack](#stack)
-- [Modelos de domínio](#modelos-de-domínio)
-- [Como executar](#como-executar)
-- [Variáveis de ambiente](#variáveis-de-ambiente)
-- [Endpoints da API](#endpoints-da-api)
-- [Mensageria (RabbitMQ)](#mensageria-rabbitmq)
-- [Armazenamento de fotos (MinIO)](#armazenamento-de-fotos-minio)
-- [Backup e restauração do MongoDB](#backup-e-restauração-do-mongodb)
-- [Auditoria](#auditoria)
-- [Testes e ferramentas de apoio](#testes-e-ferramentas-de-apoio)
-- [Comandos de gerenciamento (management commands)](#comandos-de-gerenciamento-management-commands)
+1. **Busca geoespacial de imoveis** — localiza imoveis cadastrados no programa por QR Code, numero do IPTU, endereco parcial ou **proximidade geografica** (indice `2dsphere` no MongoDB).
+2. **Registro offline de coletas** — o coletor pode registrar uma coleta mesmo sem conexao; os dados ficam no SQLite local do app e sao sincronizados via endpoint `POST /api/sincronizar` quando a rede volta (idempotente por `offline_id`).
+3. **Upload de fotos** — cada coleta pode incluir uma foto enviada diretamente ao MinIO (S3-compatible).
+4. **Publicacao de eventos** — ao registrar uma coleta, o MS publica um evento na fila `coletas` (RabbitMQ), que o Core consome para creditar pontos ao morador.
+5. **Replica de imoveis** — consome a fila `imoveis` (publicada pelo Core) e mantem uma replica local no MongoDB com dados geoespaciais otimizados para consulta em campo.
 
-## Arquitetura
+### Fluxo de Dados
 
 ```
-                 fila "imoveis"                      fila "coletas"
-Core (Postgres) ───────────────────▶  cp-collection-ms  ───────────────────▶ Core (Postgres)
-  cadastra imóvel                    consome e grava           publica coleta   computa pontos
-  publica evento                     no MongoDB                registrada      do morador
+Core (PostgreSQL)                 cp-collection-ms                 App Mobile (Expo)
+     │                                  │                                │
+     ├─ publica fila "imoveis" ────────►│ consome e grava no MongoDB     │
+     │                                  │                                │
+     │                                  │◄── GET /api/imoveis/proximos ──┤ (busca imovel)
+     │                                  │◄── POST /api/coletas ──────────┤ (registra coleta + foto)
+     │                                  │                                │
+     │◄─── fila "coletas" ──────────────┤ publica evento                 │
+     │   (Celery credita pontos)        │                                │
 ```
 
-- O **Core** publica na fila `imoveis` sempre que um imóvel adere ao programa. O comando `consumir_imoveis` deste serviço consome essa fila e faz *upsert* do imóvel no MongoDB (`Imovel.objects.upsert_from_evento`).
-- O **coletor**, usando o app deste microsserviço, busca o imóvel (por QR Code, número do IPTU ou endereço) e registra uma coleta (`POST /api/coletas`).
-- Ao salvar a coleta, o serviço publica um evento na fila `coletas`, que o Core consome para creditar a pontuação do morador.
-- Todo o fluxo end-to-end está documentado passo a passo em [`apresentacao_fluxo.md`](apresentacao_fluxo.md).
+---
 
-## Stack
+## Tecnologias
 
-- **Django 6** + **Django REST Framework**
-- **MongoDB** via [`django-mongodb-backend`](https://github.com/mongodb/django-mongodb-backend) (incluindo índice `2dsphere` para busca geoespacial)
-- **RabbitMQ** (via `pika`) para mensageria assíncrona com o Core
-- **MinIO** (S3-compatible) para armazenamento das fotos das coletas
-- **JWT** (`djangorestframework-simplejwt`) para autenticação
-- **Docker / Docker Compose** para orquestração local
+### Stack Principal
 
-## Modelos de domínio
-
-| Model | App | Descrição |
+| Camada | Tecnologia | Versao |
 |---|---|---|
-| `Coletor` | `coletores` | Usuário autenticável do microsserviço (`AUTH_USER_MODEL`); estende `AbstractUser` com `matricula` (= `username`), `zona`, `cargo`. |
-| `Imovel` | `coleta` | Réplica local (MongoDB) do imóvel cadastrado no Core, sincronizada via fila `imoveis`. Guarda `location` em GeoJSON para busca por proximidade. |
-| `Coleta` | `coleta` | Registro de uma coleta feita por um `Coletor` em um `Imovel`: peso total, foto, status de sincronização com o Core, controle de tentativas/erros. |
+| **Linguagem** | Python | — (`3.12` via `.python-version`) |
+| **Framework Web** | Django | 6.0 |
+| **API REST** | Django REST Framework | 3.17 |
+| **Banco de Dados** | MongoDB | 7.0 |
+| **Backend MongoDB** | `django-mongodb-backend` | 6.0 |
+| **Mensageria** | RabbitMQ (via `pika`) | 3-management-alpine |
+| **Object Storage** | MinIO (S3-compatible) | latest |
+| **Autenticacao** | `djangorestframework-simplejwt` (JWT) | 5.5 |
+| **Infraestrutura** | Docker / Docker Compose | — |
 
-## Como executar
+### Por que MongoDB?
 
-### Com Docker Compose (recomendado)
+Diferente do Core (que usa PostgreSQL para dados relacionais e integridade transacional), este microservico usa **MongoDB** por tres razoes principais:
 
-```bash
-cp .env.example .env   # ajuste os valores se necessário
-docker-compose up -d
+- **Busca geoespacial nativa** — indices `2dsphere` permitem queries `$near` para encontrar imoveis por proximidade (essencial para o coletor em campo).
+- **Schema flexivel** — os dados de imoveis replicados do Core podem evoluir sem migracoes rigidas.
+- **Alta ingestao de escrita** — registros de coleta sao write-heavy e o MongoDB lida bem com esse perfil.
+
+### Bibliotecas e Suas Funcoes
+
+| Biblioteca | Funcao |
+|---|---|
+| `django-mongodb-backend` | Backend oficial MongoDB para Django ORM (models, migrations, admin) |
+| `pymongo` | Driver MongoDB de baixo nivel (usado pelo backend) |
+| `dnspython` | Resolucao DNS para conexoes MongoDB Atlas |
+| `pika` | Cliente RabbitMQ — publica na fila `coletas`, consome da fila `imoveis` |
+| `minio` | SDK MinIO para upload de fotos das coletas |
+| `djangorestframework-simplejwt` | Autenticacao JWT dos coletores |
+| `django-cors-headers` | CORS para o app mobile |
+| `django-prometheus` | Exporta metricas para o Prometheus (`/metrics`) |
+| `gunicorn` | Servidor WSGI de producao |
+
+### Estrutura de Apps Django
+
+```
+cp-collection-ms/
+├── coleta/           # Models Imovel (GeoJSON), Coleta (registro de coleta),
+│                     #   endpoints de busca e sincronizacao, services (storage,
+│                     #   fila RabbitMQ), management commands
+├── coletores/        # Model Coletor (AUTH_USER_MODEL) com matricula, zona, cargo
+├── custom_audit/     # Middleware + signals para auditoria em MongoDB (audit_logs)
+├── mongo_migrations/ # Migrations customizadas para admin, auth, contenttypes no MongoDB
+├── config/           # settings.py, urls.py (configuracao central)
+├── mongo-backup/     # Scripts de backup/restore do MongoDB (mongodump/mongorestore)
+└── scripts/          # Manutencao automatizada (limpeza de logs, indices) e relatorios
 ```
 
-Isso inicia:
-- `mongodb` — banco do microsserviço (host: `27018`, dentro da rede: `27017`)
-- `app` — aplicação Django (host: `8002`, dentro do container: `8001`)
-- `coleta-ms-consumer` — consumidor da fila `imoveis` (`python manage.py consumir_imoveis`)
-- `mongo-backup` — backup diário do MongoDB via `mongodump` (ver [Backup e restauração do MongoDB](#backup-e-restauração-do-mongodb))
+### Servicos Docker
 
-> O serviço `app` espera uma rede externa `coleta-shared`, criada pelo `docker-compose` do projeto **Coleta-Premiada** (Core), para acessar o RabbitMQ compartilhado entre os dois sistemas. Suba o Core antes (ou crie a rede manualmente: `docker network create coleta-shared`).
+| Servico | Descricao |
+|---|---|
+| `ms-db` | MongoDB 7.0 com autenticacao (admin database) |
+| `rabbitmq-local` | RabbitMQ com management UI (portas `5673`/`15673` para nao conflitar com o Core) |
+| `ms` | API Django em modo dev (`runserver`) — porta `8002` |
+| `ms-consumer` | Consumidor da fila `imoveis` (`manage.py consumir_imoveis`) |
+| `mongo-backup` | Backup diario via `mongodump` (cron `0 3 * * *`), compactado com gzip, retencao de 7 dias |
+| `mongo-maintenance` | Limpeza batch de `audit_logs` (TTL 90 dias) e manutencao periodica de indices |
+| `mongodb-exporter` | Exporta metricas do MongoDB para Prometheus (Percona) |
 
-Após subir os containers, aplique as migrations e garanta os índices do MongoDB:
+---
+
+## Instalacao
+
+### Pre-requisitos
+
+- [Docker](https://docs.docker.com/engine/install/) e [Docker Compose](https://docs.docker.com/compose/install/)
+- [Git](https://git-scm.com/)
+
+### Passo a Passo (Docker — modo standalone)
+
+Este compose sobe o MS com suas proprias instancias de MongoDB e RabbitMQ (portas diferentes para nao conflitar com o Core).
+
+**1. Clone e acesse:**
 
 ```bash
-docker exec -it coleta-ms-app python manage.py migrate
-docker exec -it coleta-ms-app python manage.py ensure_audit_indexes
+git clone <url-do-repositorio> cp-collection-ms
+cd cp-collection-ms
 ```
 
-### Localmente (sem Docker)
+**2. Configure as variaveis:**
+
+```bash
+cp .env.example .env
+```
+
+Edite o `.env` e ajuste as credenciais, especialmente:
+- `DJANGO_SECRET_KEY` — chave secreta do Django
+- `CORE_JWT_SECRET_KEY` — deve ser **igual** ao `DJANGO_SECRET_KEY` do Core em producao (para validar JWTs)
+- `MONGO_USER`, `MONGO_PASSWORD` — credenciais do MongoDB
+- `RABBITMQ_DEFAULT_USER`, `RABBITMQ_DEFAULT_PASS` — credenciais do RabbitMQ
+- `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY` — credenciais do MinIO
+
+**3. Suba os containers:**
+
+```bash
+docker compose up -d
+```
+
+**4. Aplique as migrations e garanta indices:**
+
+```bash
+docker compose exec ms python manage.py migrate
+docker compose exec ms python manage.py ensure_audit_indexes
+```
+
+**5. Acesse:**
+
+| Recurso | URL |
+|---|---|
+| **API REST** | `http://localhost:8002/api/` |
+| **Django Admin (MongoDB)** | `http://localhost:8002/admin/` |
+| **RabbitMQ Management** | `http://localhost:15673` |
+
+### Passo a Passo (Local, sem Docker)
 
 ```bash
 python -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 
-cp .env.example .env   # configure Mongo/RabbitMQ/MinIO apontando para localhost
+cp .env.example .env   # ajuste host/port apontando para localhost
 
 python manage.py migrate
 python manage.py ensure_audit_indexes
 python manage.py runserver 0.0.0.0:8001
 ```
 
-Para também consumir a fila `imoveis` localmente:
+Para consumir a fila `imoveis`:
 
 ```bash
 python manage.py consumir_imoveis
 ```
 
-## Variáveis de ambiente
+### Comandos Uteis (via Makefile)
 
-Definidas em `.env` (veja [`.env.example`](.env.example)):
+```bash
+make up                   # Sobe containers
+make down                 # Derruba containers
+make logs                 # Logs em tempo real
+make shell                # Bash no container ms
+make migrate              # Aplica migrations
+make migrations           # Gera novas migrations
+make maintenance-cleanup  # Limpeza manual de audit_logs antigos
+make maintenance-reindex  # Reindexacao manual do MongoDB
+make ci-up                # Sobe com verificacao de saude (CI/CD)
+```
 
-| Variável | Descrição |
-|---|---|
-| `DJANGO_SECRET_KEY` / `DEBUG` | Configuração padrão do Django. |
-| `MONGO_INITDB_DATABASE`, `MONGO_USER`, `MONGO_PASSWORD`, `MONGO_HOST`, `MONGO_PORT` | Conexão com o MongoDB. |
-| `RABBITMQ_HOST`, `RABBITMQ_PORT`, `RABBITMQ_DEFAULT_USER`, `RABBITMQ_DEFAULT_PASS` | Conexão com o RabbitMQ compartilhado com o Core. |
-| `MINIO_ENDPOINT`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`, `MINIO_BUCKET_NAME`, `MINIO_USE_HTTPS` | Conexão com o MinIO para upload das fotos de coleta. |
+### Mensageria (Filas RabbitMQ)
 
-## Endpoints da API
-
-Todos os endpoints (exceto registro/login) exigem `Authorization: Bearer <token>` (JWT do `Coletor`).
-
-### Autenticação (`coletores`)
-
-| Método | Endpoint | Descrição |
-|---|---|---|
-| `POST` | `/api/auth/register` | Cadastra um novo coletor (`matricula`, `senha`, `nome`, `email`, `zona`, `cargo`). |
-| `POST` | `/api/auth/login` | Login por `matricula`/`senha`, retorna token JWT. |
-| `POST` | `/api/auth/logout` | Encerra a sessão (stateless, apenas confirmação). |
-| `GET` | `/api/me` | Dados do coletor autenticado. |
-
-### Imóveis (`coleta`)
-
-| Método | Endpoint | Descrição |
-|---|---|---|
-| `GET` | `/api/imoveis/buscar?tipo=&valor=` | Busca por `numero` (IPTU), `qrcode` (id) ou `endereco` (parcial, com `limit`). |
-| `GET` | `/api/imoveis/proximos?lat=&lng=&raio=` | Imóveis ativos num raio em metros (padrão 200 m), ordenados por distância via `$near`/`2dsphere`. |
-| `GET` | `/api/imoveis/<id>` | Detalhe do imóvel, com histórico das últimas 10 coletas. |
-
-### Coletas (`coleta`)
-
-| Método | Endpoint | Descrição |
-|---|---|---|
-| `POST` | `/api/coletas` | Registra uma coleta (multipart, com `foto` opcional enviada ao MinIO). Idempotente via `offline_id`. Publica na fila `coletas`. |
-| `GET` | `/api/coletas/historico?tipo_periodo=&data=&page=&limit=` | Histórico de coletas do coletor autenticado (`hoje`, `ontem`, `semana`, `mes` ou data específica). |
-| `GET` | `/api/coletas/pendentes` | Coletas ainda não sincronizadas com o Core. |
-| `GET` | `/api/coletas/<id>` | Detalhe de uma coleta do coletor autenticado. |
-
-### Sincronização (`coleta`)
-
-| Método | Endpoint | Descrição |
-|---|---|---|
-| `POST` | `/api/sincronizar` | Sincroniza em lote coletas feitas offline (`{"coletas": [...]}`), idempotente por `offline_id`. |
-| `GET` | `/api/sincronizacao/status` | Resumo: pendentes, sincronizadas hoje, última sincronização, detalhes dos pendentes. |
-
-> Uma collection do Insomnia com o fluxo completo está em [`insomnia.yaml`](insomnia.yaml).
-
-## Mensageria (RabbitMQ)
-
-Duas filas compartilhadas com o Core:
-
-| Fila | Publicador | Consumidor | Disparada por |
+| Fila | Publicador | Consumidor | Evento |
 |---|---|---|---|
-| `imoveis` | Core | Este MS (`consumir_imoveis`) | Cadastro/atualização de imóvel no Core. |
-| `coletas` | Este MS (`services/fila.py`) | Core | `POST /api/coletas` ou `POST /api/sincronizar`. |
+| `imoveis` | Core | `ms-consumer` (este MS) | Imovel cadastrado/atualizado no Core |
+| `coletas` | Este MS | Core (Celery) | Coleta registrada em campo |
 
-- Se a publicação na fila `coletas` falhar (RabbitMQ indisponível), a coleta é salva normalmente com `sincronizado_core=False` e pode ser reenviada depois com o comando `reenviar_coletas`.
-- `teste_mq.py` é uma ferramenta de linha de comando interativa para publicar, escutar e inspecionar essas filas manualmente, sem depender da aplicação Django.
+### Backup e Restauracao do MongoDB
 
-## Armazenamento de fotos (MinIO)
-
-`coleta/services/storage.py` faz upload da foto da coleta para o bucket configurado em `MINIO_BUCKET_NAME` (criado automaticamente se não existir) e retorna a URL pública do objeto, salva em `Coleta.foto_url`.
-
-## Backup e restauração do MongoDB
-
-O serviço `mongo-backup` (definido em [`mongo-backup/`](mongo-backup/)) sobe junto com o `docker-compose` e mantém backups automáticos do banco `coleta_db`:
-
-- Roda `mongodump` todo dia às **03h** (cron `0 3 * * *`, configurável via `CRON_SCHEDULE`).
-- Compacta o dump em um único arquivo com `--archive` + `--gzip` (`coleta_db_AAAAMMDD_HHMMSS.gz`).
-- Mantém apenas os **7 backups mais recentes** (configurável via `BACKUP_RETENTION`), apagando os mais antigos a cada execução.
-- Grava tudo no volume nomeado `mongo_backups`, montado em `/backups/mongo` — os arquivos sobrevivem a `docker-compose down` (mas não a `docker-compose down -v`).
-
-### Backup manual (sem esperar o cron)
+Backups automaticos rodam diariamente as 03h. Para operacoes manuais:
 
 ```bash
+# Backup manual
 docker exec coleta-mongo-backup /scripts/backup.sh
-```
 
-### Listar backups disponíveis
-
-```bash
+# Listar backups
 docker exec coleta-mongo-backup ls -lh /backups/mongo
-```
 
-### Recuperação de desastre (restore)
-
-`mongo-backup/restore.sh` usa `mongorestore` para repor um dump no MongoDB. Por padrão restaura o backup **mais recente** e pede confirmação antes de continuar, pois **substitui (`--drop`) as collections existentes** em `coleta_db`:
-
-```bash
-# Restaura o backup mais recente, com confirmação interativa
+# Restaurar backup mais recente (com confirmacao)
 docker exec -it coleta-mongo-backup /scripts/restore.sh
 
-# Restaura um arquivo específico (nome do arquivo dentro de /backups/mongo)
+# Restaurar arquivo especifico
 docker exec -it coleta-mongo-backup /scripts/restore.sh coleta_db_20260101_030000.gz
-
-# Pula a confirmação interativa (uso em scripts/CI)
-docker exec coleta-mongo-backup /scripts/restore.sh -y
 ```
 
-Passo a passo recomendado em caso de perda de dados:
+---
 
-1. Confirme que o container `mongodb` está saudável: `docker compose ps mongodb`.
-2. Liste os backups disponíveis (comando acima) e escolha o arquivo desejado (ou deixe em branco para usar o mais recente).
-3. Execute o `restore.sh` correspondente. Ele roda `mongorestore --drop`, ou seja, as collections presentes no dump são recriadas do zero; collections que não constam no dump **não** são apagadas.
-4. Valide os dados (ex.: `docker exec -it coleta-mongodb mongosh "mongodb://coleta_user:senha123@localhost:27017/coleta_db?authSource=admin"`).
-5. Se a aplicação (`app`/`coleta-ms-consumer`) estava de pé durante a restauração, reinicie-a (`docker compose restart app coleta-ms-consumer`) para garantir que conexões/caches fiquem consistentes com os dados restaurados.
+## Documentacao Adicional
 
-> O `mongo-backup` só conecta no `mongodb` da rede `coleta-ms-network` — ele não expõe portas nem precisa da rede `coleta-shared`.
-
-## Auditoria
-
-O app `custom_audit` registra automaticamente quem fez o quê, quando e de onde sobre os models `Coleta` e `Imovel` — INSERT/UPDATE/DELETE via Django Signals e SELECT via middleware, gravando tudo na coleção MongoDB `audit_logs` (com TTL de 90 dias). É passivo: nunca derruba a aplicação principal em caso de falha.
-
-Documentação completa em [`docs/auditoria.md`](docs/auditoria.md).
-
-## Testes e ferramentas de apoio
-
-- [`test_integration.py`](test_integration.py) — valida o fluxo ponta-a-ponta entre este microsserviço e o Core (incluindo a propagação via RabbitMQ), com relatório final em tabela. Configuração em [`config.yaml`](config.yaml). Execução: `python test_integration.py` (requer Core e MS rodando via Docker Compose).
-- [`teste_mq.py`](teste_mq.py) — menu interativo para testar as filas RabbitMQ isoladamente (publicar, escutar, inspecionar).
-- `coleta/tests.py` — testes unitários Django (`python manage.py test`).
-
-## Comandos de gerenciamento (management commands)
-
-| Comando | App | Descrição |
-|---|---|---|
-| `consumir_imoveis` | `coleta` | Inicia o consumidor da fila `imoveis`, com reconexão automática em caso de queda do RabbitMQ. |
-| `reenviar_coletas` | `coleta` | Reenvia para a fila `coletas` todas as coletas com `sincronizado_core=False`. |
-| `ensure_audit_indexes` | `custom_audit` | Cria/garante os índices do MongoDB para `audit_logs`, incluindo o TTL de 90 dias. Idempotente. |
+- [Apresentacao do Fluxo](apresentacao_fluxo.md) — Fluxo end-to-end detalhado
+- [Docs/Auditoria](docs/auditoria.md) — Especificacao completa da auditoria
+- [`test_integration.py`](test_integration.py) — Teste de integracao ponta-a-ponta (Core + MS)
+- [`teste_mq.py`](teste_mq.py) — Ferramenta interativa para testar filas RabbitMQ
+- [`config.yaml`](config.yaml) — Configuracao do teste de integracao

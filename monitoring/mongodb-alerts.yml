@@ -1,0 +1,158 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+#  REFERÊNCIA LOCAL — Regras de alerta para o MongoDB (cp-collection-ms).
+#
+#  ⚠ ATENÇÃO: Este arquivo NÃO é carregado pelo Prometheus.
+#
+#  O arquivo canônico com todos os alertas (PostgreSQL + MongoDB + infra) está em:
+#    ../coleta-observability/monitoring/alerts.yml
+#
+#  Esse arquivo é mantido apenas para documentação e consulta rápida.
+#  Qualquer alteração deve ser feita no arquivo central.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+groups:
+  - name: mongodb_cp_collection
+    interval: 30s
+    rules:
+
+      # ── MongoDB DOWN ─────────────────────────────────────────────────────────
+      - alert: MongoDBDown
+        expr: mongodb_up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "MongoDB (cp-collection-ms) esta DOWN"
+          description: >
+            O exporter nao consegue conectar ao MongoDB em {{ $labels.instance }}.
+            Verifique imediatamente o servico ms-db.
+
+      # ── Conexoes ─────────────────────────────────────────────────────────────
+      - alert: MongoDBConnectionsHigh
+        expr: >
+          mongodb_connections{state="current"}
+          / mongodb_connections_max > 0.8
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "MongoDB com mais de 80% de conexoes em uso"
+          description: >
+            {{ $value | humanizePercentage }} das conexoes disponiveis
+            estao em uso ({{ $labels.instance }}).
+
+      - alert: MongoDBConnectionsCritical
+        expr: >
+          mongodb_connections{state="current"}
+          / mongodb_connections_max > 0.95
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "MongoDB com mais de 95% de conexoes em uso"
+          description: >
+            {{ $value | humanizePercentage }} das conexoes em uso.
+            O MongoDB esta proximo do limite maximo de conexoes.
+
+      # ── Replicacao ───────────────────────────────────────────────────────────
+      - alert: MongoDBReplicationLag
+        expr: >
+          mongodb_mongod_replset_member_replication_lag{member_state="PRIMARY"}
+          > 30
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Lag de replicacao do MongoDB acima de 30s"
+          description: >
+            Replica {{ $labels.name }} esta {{ $value }}s atras do primario.
+
+      - alert: MongoDBReplicationLagCritical
+        expr: >
+          mongodb_mongod_replset_member_replication_lag{member_state="PRIMARY"}
+          > 300
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Lag de replicacao do MongoDB critico (> 5 min)"
+          description: >
+            Replica {{ $labels.name }} esta {{ $value }}s atras.
+            Risco de perda de dados.
+
+      - alert: MongoDBReplicaHealth
+        expr: mongodb_mongod_replset_member_health < 1
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Membro do replica set MongoDB indisponivel"
+          description: >
+            Membro {{ $labels.name }} do replica set esta com health =
+            {{ $value }}.
+
+      # ── Locks ────────────────────────────────────────────────────────────────
+      - alert: MongoDBQueueLong
+        expr: >
+          mongodb_mongod_global_lock_current_queue{type="total"}
+          > 10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Fila de locks globais do MongoDB com mais de 10 operacoes"
+          description: >
+            {{ $value }} operacoes aguardando na fila de lock global
+            em {{ $labels.instance }}.
+
+      # ── Operacoes lentas ─────────────────────────────────────────────────────
+      - alert: MongoDBSlowOperations
+        expr: >
+          rate(mongodb_mongod_metrics_operation_slow_total[5m]) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "MongoDB com taxa elevada de operacoes lentas"
+          description: >
+            {{ $value | humanize }}/s operacoes excedendo o slow-ms
+            threshold em {{ $labels.instance }}.
+
+      # ── Cache WiredTiger ─────────────────────────────────────────────────────
+      - alert: MongoDBWiredTigerCachePressure
+        expr: >
+          mongodb_mongod_wiredtiger_cache_bytes
+          / mongodb_mongod_wiredtiger_cache_max_bytes > 0.9
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Cache WiredTiger do MongoDB com alta pressao (> 90%)"
+          description: >
+            {{ $value | humanizePercentage }} do cache WiredTiger esta em uso.
+            Considere aumentar o cache ou otimizar queries.
+
+      # ── Cursors abertos ──────────────────────────────────────────────────────
+      - alert: MongoDBOpenCursorsHigh
+        expr: mongodb_mongod_metrics_cursor_open_total > 1000
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "MongoDB com mais de 1000 cursores abertos"
+          description: >
+            {{ $value }} cursores abertos em {{ $labels.instance }}.
+            Possivel vazamento de cursores ou queries sem timeout.
+
+      # ── Assert/Erros ─────────────────────────────────────────────────────────
+      - alert: MongoDBAssertsWarning
+        expr: >
+          rate(mongodb_mongod_metrics_asserts_warning_total[5m]) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "MongoDB gerando warns de assert"
+          description: >
+            {{ $value | humanize }}/s asserts de warning em
+            {{ $labels.instance }}. Verifique os logs do MongoDB.

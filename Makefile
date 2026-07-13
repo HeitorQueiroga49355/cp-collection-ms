@@ -24,6 +24,20 @@ createsuperuser:
 shell:
 	docker compose exec ms bash
 
+# Comandos de manutencao do MongoDB
+
+maintenance-cleanup:
+	docker compose run --rm mongo-maintenance sh /maintenance/mongo_cleanup.sh
+
+maintenance-reindex:
+	docker compose run --rm mongo-maintenance sh /maintenance/mongo_index_maintenance.sh
+
+# Relatorio de monitoramento (Python)
+# Requer: pip install pymongo
+# Uso: make monitor-report ARGS="--json --output /tmp/report.json"
+monitor-report:
+	docker compose run --rm mongo-maintenance python3 /scripts/mongo_monitoring_report.py $(ARGS)
+
 # Comandos para CI
 
 ci-up:

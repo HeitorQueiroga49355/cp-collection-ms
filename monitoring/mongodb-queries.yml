@@ -1,0 +1,50 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+#  Queries customizadas para o mongodb-exporter (Percona).
+#
+#  Estas queries expoem metricas adicionais que o exporter nao coleta por padrao,
+#  como numero de documentos por colecao, operacoes lentas, etc.
+#
+#  Montado como volume em: /etc/mongodb-exporter/queries.yml
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# ── Status do wiredTiger ──────────────────────────────────────────────────────
+mongo_wiredtiger_cache:
+  query: |
+    db.serverStatus().wiredTiger.cache
+  metrics:
+    - "bytes currently in the cache":
+        usage: "GAUGE"
+        description: "Bytes atualmente no cache WiredTiger"
+    - "maximum bytes configured":
+        usage: "GAUGE"
+        description: "Tamanho maximo configurado do cache WiredTiger"
+
+# ── Contagem de documentos por colecao ────────────────────────────────────────
+mongo_collections_document_count:
+  query: |
+    db.getCollectionNames().reduce((acc, name) => {
+      if (name.startsWith('system.')) return acc;
+      acc[name] = db[name].countDocuments({});
+      return acc;
+    }, {})
+  metrics:
+    - "*":
+        usage: "GAUGE"
+        description: "Total de documentos na colecao"
+
+# ── Fragmentacao das colecoes ─────────────────────────────────────────────────
+mongo_collections_fragmentation:
+  query: |
+    db.getCollectionNames().reduce((acc, name) => {
+      if (name.startsWith('system.')) return acc;
+      const stats = db[name].stats();
+      const frag = stats.storageSize > 0
+        ? Math.round(100 * (1 - stats.size / stats.storageSize))
+        : 0;
+      acc[name] = frag;
+      return acc;
+    }, {})
+  metrics:
+    - "*":
+        usage: "GAUGE"
+        description: "Fragmentacao percentual da colecao"
