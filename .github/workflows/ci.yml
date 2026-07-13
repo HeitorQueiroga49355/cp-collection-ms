@@ -26,6 +26,4 @@ jobs:
       - name: Check migrations
         run: make migrations-check
 
-      - name: Apply migrations
-        run: make migrate-apply
-      
+

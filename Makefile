@@ -33,5 +33,3 @@ check:
 	docker compose run --rm ms python manage.py check
 migrations-check:
 	docker compose run --rm ms python manage.py makemigrations --check --dry-run
-migrate-apply:
-	docker compose run --rm ms python manage.py migrate
