@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  push: 
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+
+jobs:
+  check-ci:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup env
+        run: cp .env.example .env
+
+      - name: Install project
+        run: make ci-up
+      
+      - name: Check Django
+        run: make check
+
+      - name: Check migrations
+        run: make migrations-check
+
+
