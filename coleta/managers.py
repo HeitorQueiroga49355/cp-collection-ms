@@ -20,6 +20,7 @@ class ImovelManager(models.Manager):
             'motivo_inelegivel': payload.get('motivo_inelegivel', ''),
             'location': self.model.montar_location(latitude, longitude),
             'ativo': payload.get('ativo', True),
+            'proprietario_id': payload.get('proprietario_id'),
         }
         return self.update_or_create(id_externo=inscricao, defaults=defaults)
 

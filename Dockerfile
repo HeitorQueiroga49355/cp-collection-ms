@@ -24,3 +24,16 @@ COPY . .
 EXPOSE 8001
 
 CMD ["python", "manage.py", "runserver", "0.0.0.0:8001"]
+
+
+# -----------------
+#     PRODUCTION
+# -----------------
+
+FROM base AS production
+
+COPY . .
+
+EXPOSE 8001
+
+CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8001", "--workers", "4", "--timeout", "120"]

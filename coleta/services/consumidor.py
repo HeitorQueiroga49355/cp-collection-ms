@@ -5,6 +5,8 @@ import os
 import django
 import pika
 
+from coleta.services.auditoria import registrar_evento
+
 logger = logging.getLogger(__name__)
 
 FILA_IMOVEIS = 'imoveis'
@@ -15,11 +17,23 @@ def _callback(canal, method, _properties, body):
         payload = json.loads(body)
     except json.JSONDecodeError as e:
         logger.error(f"Mensagem inválida (não é JSON): {e} — descartando")
+        registrar_evento(
+            'fila_consume', 'mensagem_malformada',
+            nivel='error',
+            fila=FILA_IMOVEIS,
+            detalhe={'body': body[:500].decode('utf-8', errors='replace')},
+        )
         canal.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
         return
 
     if not payload.get('inscricao_imobiliaria'):
         logger.error(f"Mensagem sem 'inscricao_imobiliaria' — descartando: {payload}")
+        registrar_evento(
+            'fila_consume', 'mensagem_campo_ausente',
+            nivel='warning',
+            fila=FILA_IMOVEIS,
+            detalhe=payload,
+        )
         canal.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
         return
 
@@ -38,6 +52,12 @@ def _callback(canal, method, _properties, body):
         logger.error(
             f"Erro ao processar imóvel "
             f"(inscricao={payload.get('inscricao_imobiliaria')}): {e}"
+        )
+        registrar_evento(
+            'fila_consume', 'mensagem_reenfileirada',
+            nivel='warning',
+            fila=FILA_IMOVEIS,
+            detalhe={'erro': str(e), 'inscricao_imobiliaria': payload.get('inscricao_imobiliaria')},
         )
         canal.basic_nack(delivery_tag=method.delivery_tag, requeue=True)
 
