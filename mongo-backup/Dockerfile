@@ -9,7 +9,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/* \
     && ARCH=$(dpkg --print-architecture) \
     && curl -fsSL \
-         "https://dl.min.io/client/mc/release/linux-${ARCH}/archive/mc.${MC_VERSION}" \
+         "https://github.com/minio/mc/releases/download/${MC_VERSION}/mc.linux-${ARCH}" \
          -o /usr/local/bin/mc \
     && chmod +x /usr/local/bin/mc
 
