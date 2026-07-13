@@ -2,9 +2,9 @@ name: CI
 
 on:
   push: 
-    branches: [main, develop, temp_develop]
+    branches: [main, develop]
   pull_request:
-    branches: [main, develop, temp_develop]
+    branches: [main, develop]
 
 
 jobs:
@@ -18,7 +18,7 @@ jobs:
         run: cp .env.example .env
 
       - name: Install project
-        run: make up
+        run: make ci-up
       
       - name: Check Django
         run: make check
@@ -27,5 +27,5 @@ jobs:
         run: make migrations-check
 
       - name: Apply migrations
-        run: make migrate-check
+        run: make migrate-apply
       
