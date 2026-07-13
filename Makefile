@@ -27,6 +27,7 @@ shell:
 # Comandos para CI
 
 ci-up:
+	docker network create coleta-observability 2>/dev/null || true
 	docker compose up -d --wait
 check:
 	docker compose run --rm ms python manage.py check
