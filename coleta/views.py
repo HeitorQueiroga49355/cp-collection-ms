@@ -298,6 +298,7 @@ class ColetaCreateView(APIView):
             inscricao_imobiliaria=coleta.imovel.id_externo,
             peso_total_kg=str(coleta.peso_total_kg),
             data_hora=coleta.data_hora.isoformat(),
+            foto_url=str(coleta.foto_url) if coleta.foto_url else '',
         )
         coleta.sincronizado_core = enviado
         coleta.tentativas_sincronizacao = 1
@@ -568,6 +569,7 @@ class SincronizarView(APIView):
                     inscricao_imobiliaria=coleta.imovel.id_externo,
                     peso_total_kg=str(coleta.peso_total_kg),
                     data_hora=coleta.data_hora.isoformat(),
+                    foto_url=str(coleta.foto_url) if coleta.foto_url else '',
                 )
                 coleta.sincronizado_core = enviado
                 coleta.tentativas_sincronizacao = 1

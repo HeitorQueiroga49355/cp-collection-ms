@@ -39,4 +39,5 @@ def upload_foto_coleta(file_obj, content_type: str = 'image/jpeg') -> str:
     )
 
     protocol = 'https' if settings.MINIO_USE_HTTPS else 'http'
-    return f"{protocol}://{settings.MINIO_ENDPOINT}/{bucket}/{object_name}"
+    public_host = getattr(settings, 'MINIO_PUBLIC_ENDPOINT', settings.MINIO_ENDPOINT)
+    return f"{protocol}://{public_host}/{bucket}/{object_name}"

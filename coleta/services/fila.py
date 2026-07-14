@@ -14,12 +14,14 @@ def publicar_coleta(
     inscricao_imobiliaria: str,
     peso_total_kg: str,
     data_hora: str,
+    foto_url: str = '',
 ) -> bool:
     payload = {
         'coleta_id': coleta_id,
         'inscricao_imobiliaria': inscricao_imobiliaria,
         'peso_total_kg': peso_total_kg,
         'data_hora': data_hora,
+        'foto_url': foto_url,
     }
     try:
         credentials = pika.PlainCredentials(
