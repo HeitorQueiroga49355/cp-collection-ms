@@ -116,6 +116,7 @@ MINIO_SECRET_KEY = os.getenv('MINIO_SECRET_KEY', 'minioadmin')
 MINIO_BUCKET_NAME = os.getenv('MINIO_BUCKET_NAME', 'coletas')
 
 _LOG_LEVEL = os.getenv('LOG_LEVEL', 'WARNING').upper()
+MINIO_USE_HTTPS = os.getenv('MINIO_USE_HTTPS', 'False') == 'True'
 
 LOGGING = {
     'version': 1,
