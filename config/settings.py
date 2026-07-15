@@ -114,4 +114,32 @@ MINIO_PUBLIC_ENDPOINT = os.getenv('MINIO_PUBLIC_ENDPOINT', MINIO_ENDPOINT)
 MINIO_ACCESS_KEY = os.getenv('MINIO_ACCESS_KEY', 'minioadmin')
 MINIO_SECRET_KEY = os.getenv('MINIO_SECRET_KEY', 'minioadmin')
 MINIO_BUCKET_NAME = os.getenv('MINIO_BUCKET_NAME', 'coletas')
+
+_LOG_LEVEL = os.getenv('LOG_LEVEL', 'WARNING').upper()
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'json': {
+            'class': 'pythonjsonlogger.jsonlogger.JsonFormatter',
+            'format': '%(asctime)s %(levelname)s %(name)s %(message)s',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'json',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'WARNING',
+    },
+    'loggers': {
+        'coleta':       {'handlers': ['console'], 'level': _LOG_LEVEL, 'propagate': False},
+        'coletores':    {'handlers': ['console'], 'level': _LOG_LEVEL, 'propagate': False},
+        'custom_audit': {'handlers': ['console'], 'level': 'INFO',     'propagate': False},
+    },
+}
 MINIO_USE_HTTPS = os.getenv('MINIO_USE_HTTPS', 'False') == 'True'

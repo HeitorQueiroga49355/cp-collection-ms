@@ -154,7 +154,8 @@ services:
       - --collector.dbstats
       - --collector.replicasetstatus
       - --collector.diagnosticdata
-      - --collector.collstats-colls=coleta_db.audit_logs
+      - --collector.collstats
+      - --mongodb.collstats-colls=coleta_db.audit_logs
     depends_on:
       ms-db:
         condition: service_healthy
